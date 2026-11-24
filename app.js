@@ -153,7 +153,11 @@ async function login(e) {
     showLogin('Enter your full email address and password.');
     return;
   }
-  if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+  const atIndex = email.indexOf('@');
+  const domainDot = email.lastIndexOf('.');
+  const hasWhitespace = Array.from(email).some((char) => char.charCodeAt(0) <= 32);
+  if (atIndex <= 0 || atIndex !== email.lastIndexOf('@') ||
+      domainDot <= atIndex + 1 || domainDot === email.length - 1 || hasWhitespace) {
     showLogin('Enter your complete email address, including @gmail.com, @hotmail.com, or @icloud.com.');
     return;
   }
