@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#000000">
+  <meta name="robots" content="noindex">
+  <!-- The app's name comes from config.js. The logo is logo.svg (favicon: favicon.svg). -->
+  <title>chat</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400..700&family=Shrikhand&display=swap">
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+
+  <!-- Shown for a moment while checking if you're already logged in -->
+  <div id="boot" class="boot" aria-label="Loading">
+    <img class="logo logo-lg" src="logo.svg" alt="">
+  </div>
+
+  <!-- ============ LOGIN ============ -->
+  <main id="login" class="login" hidden>
+    <div class="login-art" aria-hidden="true">
+      <img class="hero-logo" src="logo.svg" alt="">
+    </div>
+
+    <form id="login-form" class="login-card" novalidate>
+      <h1 class="brand app-name">chat</h1>
+      <p class="lede app-tagline"></p>
+
+      <label class="field">
+        <span>Username</span>
+        <input id="login-user" name="username" autocomplete="username"
+               autocapitalize="none" autocorrect="off" spellcheck="false" required>
+      </label>
+      <label class="field">
+        <span>Password</span>
+        <input id="login-pass" name="password" type="password"
+               autocomplete="current-password" required>
+      </label>
+
+      <p id="login-error" class="form-error" role="alert"></p>
+      <button id="login-btn" class="btn-primary" type="submit">Log in</button>
+    </form>
+  </main>
+
+  <!-- ============ CHAT APP ============ -->
+  <div id="app" class="app" hidden>
+
+    <aside class="sidebar" aria-label="Conversations">
+      <header class="side-head">
+        <img class="logo" src="logo.svg" alt="">
+        <span class="side-title app-name">chat</span>
+      </header>
+
+      <ul id="contact-list" class="contacts"></ul>
+
+      <footer class="me-row">
+        <button id="settings-btn" class="me-btn" type="button" aria-label="Edit your profile and settings">
+          <span id="me-avatar" class="avatar avatar-me"></span>
+          <span class="me-text">
+            <span class="me-label">Your profile</span>
+            <span id="me-name" class="me-name"></span>
+          </span>
+          <svg class="gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+        </button>
+      </footer>
+    </aside>
+
+    <section id="chat" class="chat" aria-label="Chat">
+      <div id="chat-empty" class="chat-empty">
+        <img class="logo logo-lg" src="logo.svg" alt="">
+        <p>Pick a conversation to start.</p>
+      </div>
+
+      <header id="chat-head" class="chat-head" hidden>
+        <button id="back-btn" class="icon-btn back-btn" type="button" aria-label="Back to conversations">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+        </button>
+        <button id="peer-btn" class="peer-btn" type="button" aria-label="View profile">
+          <span id="peer-avatar" class="avatar"></span>
+          <span class="peer-text">
+            <span class="peer-name-row">
+              <span id="peer-name" class="peer-name"></span>
+              <span id="peer-song" class="peer-song" hidden title="Has a profile song">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 17.5a3 3 0 1 1-2-2.83V5l12-2v11.5a3 3 0 1 1-2-2.83V6.36L9 7.7z"/></svg>
+              </span>
+            </span>
+            <span id="peer-status" class="peer-status"></span>
+          </span>
+        </button>
+      </header>
+
+      <div id="stage" class="stage" hidden>
+        <div id="messages" class="messages" role="log" aria-live="polite"></div>
+        <button id="jump" class="jump" type="button" hidden>
+          New message
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <div id="drop-hint" class="drop-hint" hidden>Drop a photo to send it</div>
+      </div>
+
+      <div id="emoji-tray" class="tray" hidden></div>
+      <div id="sticker-tray" class="tray" hidden>
+        <div class="tray-head">
+          <span class="tray-title">Stickers</span>
+          <button id="sticker-manage" class="chip" type="button" hidden>Edit</button>
+        </div>
+        <div id="sticker-grid" class="sticker-grid"></div>
+        <input id="sticker-input" type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden>
+      </div>
+
+      <div id="reply-bar" class="reply-bar" hidden>
+        <span class="reply-info">
+          <span id="reply-who" class="reply-who"></span>
+          <span id="reply-text" class="reply-text"></span>
+        </span>
+        <button id="reply-cancel" class="icon-btn" type="button" aria-label="Cancel reply">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+
+      <form id="composer" class="composer" hidden>
+        <div id="compose-tools" class="compose-tools">
+          <button id="emoji-btn" class="icon-btn" type="button" aria-label="Emoji" aria-expanded="false" title="Emoji">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5c.9 1.3 2.1 2 3.5 2s2.6-.7 3.5-2"/><path d="M9 9.5h.01M15 9.5h.01" stroke-width="2.6"/></svg>
+          </button>
+          <button id="sticker-btn" class="icon-btn" type="button" aria-label="Stickers" aria-expanded="false" title="Stickers">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 12.5V7a3.5 3.5 0 0 0-3.5-3.5H7A3.5 3.5 0 0 0 3.5 7v10A3.5 3.5 0 0 0 7 20.5h5.5z"/><path d="M20.5 12.5h-5a3 3 0 0 0-3 3v5"/></svg>
+          </button>
+          <button id="image-btn" class="icon-btn" type="button" aria-label="Send a photo" title="Send a photo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="M20.5 15.5l-4.5-4.5-9 8.5"/></svg>
+          </button>
+          <input id="image-input" type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden>
+
+          <textarea id="text-input" class="text-input" rows="1"
+                    placeholder="Write a message" aria-label="Message" maxlength="4000"></textarea>
+        </div>
+
+        <!-- shown while recording a voice message -->
+        <div id="rec-bar" class="rec-bar" hidden>
+          <button id="rec-cancel" class="icon-btn" type="button" aria-label="Delete recording" title="Delete recording">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>
+          </button>
+          <span class="rec-dot" aria-hidden="true"></span>
+          <span id="rec-time" class="rec-time">0:00</span>
+          <span id="rec-wave" class="rec-wave" aria-hidden="true"></span>
+        </div>
+
+        <button id="mic-btn" class="send-btn" type="button" aria-label="Record a voice message" title="Record a voice message">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>
+        </button>
+        <button id="send-btn" class="send-btn" type="submit" aria-label="Send" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M6 11l6-6 6 6"/></svg>
+        </button>
+      </form>
+    </section>
+  </div>
+
+  <!-- Menu for a message: react, reply, copy, unsend -->
+  <div id="msg-menu" class="msg-menu" role="menu" hidden>
+    <div id="quick-reacts" class="quick-reacts"></div>
+    <button type="button" role="menuitem" data-act="reply">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 6 6v5"/></svg>
+      Reply
+    </button>
+    <button type="button" role="menuitem" data-act="sticker">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 12.5V7a3.5 3.5 0 0 0-3.5-3.5H7A3.5 3.5 0 0 0 3.5 7v10A3.5 3.5 0 0 0 7 20.5h5.5z"/><path d="M20.5 12.5h-5a3 3 0 0 0-3 3v5"/></svg>
+      Add to stickers
+    </button>
+    <button type="button" role="menuitem" data-act="copy">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>
+      Copy text
+    </button>
+    <button type="button" role="menuitem" data-act="unsend" class="danger">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>
+      <span>Unsend</span>
+    </button>
+  </div>
+
+  <!-- Someone's profile -->
+  <dialog id="profile-view" class="sheet profile-sheet" aria-labelledby="pv-name">
+    <button id="pv-close" class="icon-btn sheet-close" type="button" aria-label="Close">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+    <div class="pv-top">
+      <span id="pv-avatar" class="avatar avatar-xxl"></span>
+      <h2 id="pv-name" class="pv-name"></h2>
+      <p id="pv-username" class="pv-username"></p>
+      <p id="pv-status" class="peer-status"></p>
+    </div>
+    <p id="pv-bio" class="pv-bio"></p>
+    <div id="pv-song"></div>
+    <button id="pv-edit" class="btn-primary" type="button" hidden>Edit your profile</button>
+  </dialog>
+
+  <!-- Your profile + settings -->
+  <dialog id="settings" class="sheet sheet-tall" aria-labelledby="settings-title">
+    <form id="settings-form" novalidate>
+      <h2 id="settings-title">Your profile</h2>
+
+      <div class="avatar-edit">
+        <span id="set-avatar" class="avatar avatar-xl"></span>
+        <div class="avatar-actions">
+          <button id="avatar-change" class="btn-ghost" type="button">Change picture</button>
+          <button id="avatar-remove" class="btn-ghost danger" type="button">Remove picture</button>
+          <input id="avatar-input" type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden>
+        </div>
+      </div>
+
+      <label class="field">
+        <span>Display name</span>
+        <input id="set-name" maxlength="40" autocomplete="nickname">
+      </label>
+
+      <label class="field">
+        <span>About you <small id="bio-count" class="counter">0 / 160</small></span>
+        <textarea id="set-bio" class="area" rows="2" maxlength="160" placeholder="A line about you, your mood, what you're up to"></textarea>
+      </label>
+
+      <div class="field">
+        <span>Profile song</span>
+        <div id="song-edit" class="song-edit">
+          <div id="song-current"></div>
+          <input id="set-song-title" class="song-title-input" maxlength="100" placeholder="Song name" aria-label="Song name">
+          <div class="song-actions">
+            <button id="song-change" class="btn-ghost" type="button">Choose a song file</button>
+            <button id="song-remove" class="btn-ghost danger" type="button">Remove song</button>
+            <input id="song-input" type="file" accept="audio/*,.mp3,.m4a,.aac,.ogg,.wav,.flac" hidden>
+          </div>
+          <p class="hint">MP3, M4A, OGG or WAV, up to 20 MB. It plays when someone opens your profile and presses play.</p>
+        </div>
+      </div>
+
+      <fieldset class="pw-group">
+        <legend>Change password <small>(leave empty to keep it)</small></legend>
+        <input type="text" name="username" autocomplete="username" hidden>
+        <label class="field">
+          <span>New password</span>
+          <input id="set-pass" type="password" autocomplete="new-password" minlength="6">
+        </label>
+        <label class="field">
+          <span>Type it again</span>
+          <input id="set-pass2" type="password" autocomplete="new-password" minlength="6">
+        </label>
+      </fieldset>
+
+      <label class="switch">
+        <input id="set-notify" type="checkbox">
+        <span class="switch-ui" aria-hidden="true"></span>
+        <span>Show a notification for new messages when this tab is in the background</span>
+      </label>
+
+      <p id="set-msg" class="form-error" role="alert"></p>
+
+      <div class="sheet-actions">
+        <button id="logout-btn" class="btn-ghost danger" type="button">Log out</button>
+        <span class="spacer"></span>
+        <button id="settings-cancel" class="btn-ghost" type="button">Close</button>
+        <button id="settings-save" class="btn-primary btn-small" type="submit">Save changes</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="lightbox" class="lightbox" aria-label="Photo">
+    <img id="lightbox-img" alt="Photo">
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
