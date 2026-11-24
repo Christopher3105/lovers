@@ -3,7 +3,7 @@
 // =====================================================================
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 import {
-  SUPABASE_URL, SUPABASE_KEY, EMAIL_DOMAIN, APP_NAME, APP_TAGLINE,
+  SUPABASE_URL, SUPABASE_KEY, APP_NAME, APP_TAGLINE,
   IMAGE_BUCKET, PROFILE_BUCKET, STICKERS,
 } from './config.js';
 
@@ -139,23 +139,44 @@ function showLogin(message = '') {
 
 async function login(e) {
   e.preventDefault();
-  if (!sb) return;
-  const name = el.loginUser.value.trim().toLowerCase();
+  if (!sb) {
+    showLogin('Supabase is not configured. Check the URL and publishable key in config.js.');
+    return;
+  }
+
+  // Support Gmail, Hotmail, iCloud, and other providers by sending
+  // the complete registered email address. Never guess a domain.
+  const email = el.loginUser.value.trim().toLowerCase();
   const password = el.loginPass.value;
-  if (!name || !password) { el.loginError.textContent = 'Enter your username and password.'; return; }
+
+  if (!email || !password) {
+    showLogin('Enter your full email address and password.');
+    return;
+  }
+  if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+    showLogin('Enter your complete email address, including @gmail.com, @hotmail.com, or @icloud.com.');
+    return;
+  }
 
   el.loginBtn.disabled = true;
   el.loginBtn.textContent = 'Logging in…';
   el.loginError.textContent = '';
-  const email = name.includes('@') ? name : `${name}@${EMAIL_DOMAIN}`;
-  const { data, error } = await sb.auth.signInWithPassword({ email, password });
-  if (error) {
-    const wrong = /invalid login credentials/i.test(error.message);
-    showLogin(wrong ? 'Wrong username or password.' : `Can't log in right now: ${error.message}`);
-    return;
+
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) {
+      const wrong = /invalid login credentials/i.test(error.message);
+      showLogin(wrong
+        ? `Supabase rejected ${email}. Check that this exact address exists in Authentication → Users and that its current password is correct.`
+        : `Can't log in right now: ${error.message}`);
+      return;
+    }
+
+    el.loginPass.value = '';
+    await boot(data.user);
+  } catch (error) {
+    showLogin(`Can't log in right now: ${error?.message || 'Unexpected network error.'}`);
   }
-  el.loginPass.value = '';
-  boot(data.user);
 }
 
 async function boot(user) {
