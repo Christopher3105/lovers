@@ -21,7 +21,7 @@ export const EMAIL_DOMAIN = 'example.com';
 // (The logo is the file logo.svg — replace it to change the logo.
 //  Also change "name" in manifest.webmanifest for phone home screens.)
 export const APP_NAME = 'Lovers';
-export const APP_TAGLINE = 'A Private space fro two Lovers and their 3 cats';
+export const APP_TAGLINE = 'A Private space for two Lovers and their 3 cats';
 
 // Must match the buckets created in database.sql
 export const IMAGE_BUCKET = 'chat-images';      // photos + voice messages
