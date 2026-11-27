@@ -1131,7 +1131,7 @@ async function addDateIdea(event) {
   }
 
   state.ideas.unshift(data);
-  state.selectedIdeaId = data.id;
+  state.selectedIdeaId = null;
   $('date-idea-form').reset();
   renderDateIdeas();
   toast('Added to your date jar.');
