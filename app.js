@@ -86,7 +86,11 @@ const state = {
   replyTo: null,            // message being replied to
   menuMsg: null,            // message whose menu is open
   room: null,
+  inbox: null,
   heartbeat: null,
+  messagePoll: null,
+  pollingMessages: false,
+  seenIncoming: new Set(),
   lastTypingSent: 0,
   stickToBottom: true,
   lastSync: 0,
@@ -204,6 +208,7 @@ async function boot(user) {
   renderContacts();
   updateTitle();
   subscribe();
+  startMessagePolling();
   startHeartbeat();
 
   const saved = store.get('chat:last-chat');
@@ -215,8 +220,10 @@ function teardown() {
   sb?.removeAllChannels();
   clearInterval(state.heartbeat);
   state.typing.forEach(clearTimeout);
+  clearInterval(state.messagePoll);
   Object.assign(state, {
-    me: null, activeId: null, room: null, heartbeat: null, replyTo: null, menuMsg: null,
+    me: null, activeId: null, room: null, inbox: null, heartbeat: null, messagePoll: null,
+    pollingMessages: false, seenIncoming: new Set(), replyTo: null, menuMsg: null,
     contacts: new Map(), convos: new Map(), unread: new Map(), previews: new Map(),
     online: new Set(), typing: new Map(), reactions: new Map(), quoteCache: new Map(),
     customStickers: [], stickerEdit: false,
@@ -328,11 +335,56 @@ async function syncMissed() {
   updateTitle();
 }
 
+
+/* Keep unread messages moving even if a browser's Realtime socket drops.
+   Realtime remains the fast path; this small inbox-only query is a safety net. */
+async function pollIncomingMessages() {
+  if (!state.me || document.visibilityState !== 'visible' || state.pollingMessages) return;
+  state.pollingMessages = true;
+  try {
+    const { data, error } = await sb.from('messages')
+      .select('*')
+      .eq('receiver_id', state.me.id)
+      .is('read_at', null)
+      .is('deleted_at', null)
+      .order('id', { ascending: true })
+      .limit(100);
+
+    if (error) {
+      console.warn('Unread-message sync:', error.message);
+      return;
+    }
+
+    const unread = new Map();
+    for (const message of data || []) {
+      unread.set(message.sender_id, (unread.get(message.sender_id) || 0) + 1);
+      if (!state.seenIncoming.has(message.id)) onIncoming(message);
+    }
+
+    // Use the server's unread set as the source of truth, avoiding duplicate
+    // badges when both Realtime and the fallback observe the same message.
+    state.unread = unread;
+    renderContacts();
+    updateTitle();
+  } catch (error) {
+    console.warn('Unread-message sync failed:', error);
+  } finally {
+    state.pollingMessages = false;
+  }
+}
+
+function startMessagePolling() {
+  clearInterval(state.messagePoll);
+  pollIncomingMessages();
+  state.messagePoll = setInterval(pollIncomingMessages, 3000);
+}
+
 // ============================================================ REALTIME
 function subscribe() {
   const me = state.me.id;
+  const inbox = sb.channel(`inbox-${me}`);
 
-  sb.channel(`inbox-${me}`)
+  inbox
     // new messages to me
     .on('postgres_changes',
       { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${me}` },
@@ -353,7 +405,14 @@ function subscribe() {
     .on('postgres_changes',
       { event: 'UPDATE', schema: 'public', table: 'profiles' },
       (p) => onProfileChange(p.new))
-    .subscribe((status) => { if (status === 'SUBSCRIBED') syncMissed(); });
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        syncMissed();
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        console.warn(`Inbox Realtime status: ${status}. The unread-message sync will keep the chat current.`);
+      }
+    });
+  state.inbox = inbox;
 
   // Who is online + typing indicator
   const room = sb.channel('chat-room', { config: { presence: { key: me } } });
@@ -378,6 +437,14 @@ function subscribe() {
 }
 
 function onIncoming(m) {
+  if (!m || m.receiver_id !== state.me?.id) return;
+  if (state.seenIncoming.has(m.id)) return;
+  state.seenIncoming.add(m.id);
+  if (state.seenIncoming.size > 600) {
+    const first = state.seenIncoming.values().next().value;
+    state.seenIncoming.delete(first);
+  }
+
   const other = m.sender_id;
   if (!state.contacts.has(other)) loadContacts().then(renderContacts);
   clearTyping(other);
@@ -2227,6 +2294,14 @@ function wireEvents() {
     if (!el.menu.hidden && !el.menu.contains(e.target) && !e.target.closest('.more')) closeMenu();
   });
   window.addEventListener('resize', closeMenu);
+
+  // When the tab becomes visible again, immediately recover any unread messages.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      pollIncomingMessages();
+      if (Date.now() - state.lastSync > 3000) syncMissed();
+    }
+  });
 
   // scrolling: load older messages near the top, track "stuck to bottom"
   el.messages.addEventListener('scroll', () => {
