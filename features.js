@@ -341,20 +341,25 @@ function renderCalendar() {
     button.append(number);
 
     if (dayEvents.length) {
-      const dots = document.createElement('span');
-      dots.className = 'calendar-dots';
-      dayEvents.slice(0, 4).forEach((event) => {
-        const dot = document.createElement('i');
-        dot.style.background = event.color;
-        dots.append(dot);
+      const eventWrap = document.createElement('span');
+      eventWrap.className = 'calendar-day-events';
+
+      dayEvents.slice(0, 2).forEach((event) => {
+        const chip = document.createElement('span');
+        chip.className = 'calendar-day-event';
+        chip.style.setProperty('--event-color', event.color);
+        chip.textContent = event.title;
+        chip.title = event.repeat_yearly ? `${event.title} · Every year` : event.title;
+        eventWrap.append(chip);
       });
-      button.append(dots);
-      if (dayEvents.length > 1) {
-        const count = document.createElement('span');
-        count.className = 'calendar-day-count';
-        count.textContent = `${dayEvents.length} events`;
-        button.append(count);
+
+      if (dayEvents.length > 2) {
+        const more = document.createElement('span');
+        more.className = 'calendar-day-more';
+        more.textContent = `+${dayEvents.length - 2} more`;
+        eventWrap.append(more);
       }
+      button.append(eventWrap);
     }
     button.addEventListener('click', () => {
       state.selectedDate = iso;
