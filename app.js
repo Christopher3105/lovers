@@ -1258,6 +1258,8 @@ function openMenu(m, bubble, trigger = null) {
   el.quickReacts.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.emoji === myReact));
   el.menu.querySelector('[data-act="copy"]').hidden = m.kind !== 'text';
   el.menu.querySelector('[data-act="sticker"]').hidden = m.kind !== 'image';
+  el.menu.querySelector('[data-act="save-gallery"]').hidden = m.kind !== 'image';
+  el.menu.querySelector('[data-act="save-voice"]').hidden = m.kind !== 'audio';
   const unsendBtn = el.menu.querySelector('[data-act="unsend"]');
   unsendBtn.hidden = !mine;
   unsendBtn.dataset.armed = '';
@@ -1285,9 +1287,100 @@ function closeMenu() {
   state.menuMsg = null;
 }
 
+async function saveMessagePhotoToGallery(m) {
+  if (!m?.image_path || !state.me) return;
+  try {
+    const { data: existing, error: checkError } = await sb.from('relationship_photos')
+      .select('id').eq('source_message_id', m.id).maybeSingle();
+    if (checkError) throw checkError;
+    if (existing) return toast('This photo is already in your gallery.');
+
+    const { data: blob, error: downloadError } = await sb.storage.from(IMAGE_BUCKET).download(m.image_path);
+    if (downloadError) throw downloadError;
+
+    const extension = (m.image_path.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const types = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp' };
+    const contentType = blob.type?.startsWith('image/') ? blob.type : (types[extension] || 'image/jpeg');
+    const path = `${state.me.id}/chat-${m.id}-${crypto.randomUUID()}.${extension || 'jpg'}`;
+    const { error: uploadError } = await sb.storage.from('relationship-gallery').upload(path, blob, {
+      contentType,
+      cacheControl: '3600',
+      upsert: false,
+    });
+    if (uploadError) throw uploadError;
+
+    const date = new Date(m.created_at);
+    const photoDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    const { error: rowError } = await sb.from('relationship_photos').insert({
+      storage_path: path,
+      caption: 'Saved from chat',
+      photo_date: photoDate,
+      uploaded_by: state.me.id,
+      source_message_id: m.id,
+    });
+    if (rowError) {
+      await sb.storage.from('relationship-gallery').remove([path]);
+      if (/duplicate key/i.test(rowError.message)) return toast('This photo is already in your gallery.');
+      throw rowError;
+    }
+    toast('Photo saved to your shared gallery.');
+  } catch (error) {
+    toast(`Couldn't save photo: ${error.message || 'Unknown error'}`);
+  }
+}
+
+async function saveMessageVoiceToLibrary(m) {
+  if (!m?.image_path || !state.me) return;
+  try {
+    const { data: existing, error: checkError } = await sb.from('relationship_voice_records')
+      .select('id').eq('source_message_id', m.id).maybeSingle();
+    if (checkError) throw checkError;
+    if (existing) return toast('This voice message is already in your library.');
+
+    const { data: blob, error: downloadError } = await sb.storage.from(IMAGE_BUCKET).download(m.image_path);
+    if (downloadError) throw downloadError;
+
+    const extension = (m.image_path.split('.').pop() || 'webm').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const types = {
+      webm:'audio/webm', ogg:'audio/ogg', m4a:'audio/mp4', mp4:'audio/mp4',
+      mp3:'audio/mpeg', aac:'audio/aac', wav:'audio/wav', flac:'audio/flac',
+    };
+    const contentType = blob.type?.startsWith('audio/') ? blob.type : (types[extension] || 'audio/webm');
+    const path = `${state.me.id}/chat-${m.id}-${crypto.randomUUID()}.${extension || 'webm'}`;
+    const { error: uploadError } = await sb.storage.from('relationship-voice').upload(path, blob, {
+      contentType,
+      cacheControl: '3600',
+      upsert: false,
+    });
+    if (uploadError) throw uploadError;
+
+    const date = new Date(m.created_at);
+    const voiceDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    const info = voiceInfo(m);
+    const { error: rowError } = await sb.from('relationship_voice_records').insert({
+      storage_path: path,
+      title: `Voice message · ${fmtDuration(info.d)}`,
+      voice_date: voiceDate,
+      duration_seconds: Math.round(info.d),
+      uploaded_by: state.me.id,
+      source_message_id: m.id,
+    });
+    if (rowError) {
+      await sb.storage.from('relationship-voice').remove([path]);
+      if (/duplicate key/i.test(rowError.message)) return toast('This voice message is already in your library.');
+      throw rowError;
+    }
+    toast('Voice message saved to your shared library.');
+  } catch (error) {
+    toast(`Couldn't save voice message: ${error.message || 'Unknown error'}`);
+  }
+}
+
 function onMenuAction(act, button) {
   const m = state.menuMsg;
   if (!m) return;
+  if (act === 'save-gallery') { closeMenu(); saveMessagePhotoToGallery(m); return; }
+  if (act === 'save-voice') { closeMenu(); saveMessageVoiceToLibrary(m); return; }
   if (act === 'reply') { closeMenu(); startReply(m); }
   if (act === 'sticker') { closeMenu(); saveAsSticker(m); }
   if (act === 'copy') {
