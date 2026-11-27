@@ -180,6 +180,24 @@ create policy "Users remove their own gallery metadata"
   on public.relationship_photos for delete to authenticated
   using (uploaded_by = (select auth.uid()));
 
+drop policy if exists "Users can edit their own gallery captions" on public.relationship_photos;
+create policy "Users can edit their own gallery captions"
+  on public.relationship_photos for update to authenticated
+  using (
+    uploaded_by = (select auth.uid())
+    and exists (
+      select 1 from public.relationship_members m
+      where m.user_id = (select auth.uid())
+    )
+  )
+  with check (
+    uploaded_by = (select auth.uid())
+    and exists (
+      select 1 from public.relationship_members m
+      where m.user_id = (select auth.uid())
+    )
+  );
+
 
 -- Timeline milestones, shared date ideas, and personal daily check-ins.
 
@@ -192,6 +210,7 @@ create table if not exists public.relationship_timeline_entries (
 grant select, insert, update, delete on public.relationship_events to authenticated;
 grant select, insert, update, delete on public.relationship_tasks to authenticated;
 grant select, insert, delete on public.relationship_photos to authenticated;
+grant update (caption) on public.relationship_photos to authenticated;
 grant select, insert, delete on public.relationship_voice_records to authenticated;
 grant select, insert, delete on public.relationship_timeline_entries to authenticated;
 grant select, insert, delete on public.relationship_date_ideas to authenticated;
