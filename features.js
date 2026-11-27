@@ -1028,12 +1028,11 @@ async function loadDateIdeas() {
     return;
   }
   state.ideas = data || [];
-  if (!state.selectedIdeaId) {
-    const recent = [...state.ideas]
-      .filter((idea) => idea.last_picked_at)
-      .sort((a, b) => b.last_picked_at.localeCompare(a.last_picked_at))[0];
-    state.selectedIdeaId = recent?.id || null;
-  }
+  // Always reflect the most recent shared draw, including draws made by the other account.
+  const recent = [...state.ideas]
+    .filter((idea) => idea.last_picked_at)
+    .sort((a, b) => b.last_picked_at.localeCompare(a.last_picked_at))[0];
+  state.selectedIdeaId = recent?.id || null;
   renderDateIdeas();
 }
 
@@ -1177,8 +1176,13 @@ async function loadCheckins() {
 
   state.checkins = data || [];
   const own = state.checkins.find((entry) => entry.user_id === state.user.id && entry.checkin_date === today);
-  state.selectedMood = own?.mood || state.selectedMood || 'good';
-  $('checkin-note').value = own?.note || '';
+  const noteField = $('checkin-note');
+  const editing = document.activeElement === noteField ||
+    Boolean(document.activeElement?.matches?.('[data-mood]'));
+  if (!editing) {
+    state.selectedMood = own?.mood || 'good';
+    noteField.value = own?.note || '';
+  }
   $('checkin-date-label').textContent = formatDate(today, { weekday: 'long', day: 'numeric', month: 'long' });
   renderCheckins();
 }
