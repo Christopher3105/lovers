@@ -344,6 +344,44 @@ html, body { background: #05040a; }
 .calendar-delete:hover { color: #ff83ad; background: rgb(255 50 100 / .10); }
 .calendar-delete svg { width: 15px; height: 15px; }
 
+/* Events are shown as labelled colour strips instead of tiny dots. */
+.calendar-day {
+  min-height: clamp(88px, 9vw, 112px);
+}
+.calendar-day-events {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  margin-top: 1px;
+}
+.calendar-day-event {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  padding: 4px 6px;
+  border: 0;
+  border-left: 3px solid var(--event-color);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--event-color) 19%, transparent);
+  color: color-mix(in srgb, var(--event-color) 62%, white);
+  font-size: 10px;
+  font-weight: 750;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.calendar-day-more {
+  overflow: hidden;
+  padding-left: 3px;
+  color: #bfaac4;
+  font-size: 9px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ---------- gallery ---------- */
 .gallery-tools {
   display: grid;
@@ -481,7 +519,10 @@ html, body { background: #05040a; }
   .timer-unit strong { font-size: clamp(19px, 6vw, 27px); }
   .timer-unit span { font-size: 8px; letter-spacing: .06em; }
   .calendar-layout { grid-template-columns: minmax(0, 1fr); }
-  .calendar-day { min-height: 58px; padding: 6px; gap: 5px; border-radius: 9px; }
+  .calendar-day { min-height: 76px; padding: 6px 4px; gap: 5px; border-radius: 9px; }
+  .calendar-day-events { gap: 3px; }
+  .calendar-day-event { padding: 3px 3px; border-left-width: 2px; border-radius: 4px; font-size: 8px; }
+  .calendar-day-more { padding-left: 2px; font-size: 8px; }
   .calendar-day-number { font-size: 11px; }
   .calendar-dots { gap: 3px; }
   .calendar-dots i { width: 5px; height: 5px; }
