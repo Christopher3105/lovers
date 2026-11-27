@@ -4,7 +4,7 @@ import { SUPABASE_URL, SUPABASE_KEY } from './config.js';
 const BUCKET = 'relationship-gallery';
 const MAX_PHOTO_BYTES = 12 * 1024 * 1024;
 const $ = (id) => document.getElementById(id);
-const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+const sb = window.__loversSupabase || createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const state = {
   user: null,
