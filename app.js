@@ -18,6 +18,8 @@ const EMOJI_PICKER_URL = 'https://cdn.jsdelivr.net/npm/emoji-picker-element@1/in
 
 const isConfigured = !SUPABASE_URL.includes('YOUR-PROJECT') && !SUPABASE_KEY.startsWith('YOUR-');
 const sb = isConfigured ? createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+// Share the existing authenticated client with the private-space module.
+if (sb) window.__loversSupabase = sb;
 const isTouch = matchMedia('(pointer: coarse)').matches;
 const isNarrow = () => matchMedia('(max-width: 760px)').matches;
 
