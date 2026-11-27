@@ -14,6 +14,8 @@ const state = {
   events: [],
   tasks: [],
   photos: [],
+  voices: [],
+  voiceUrls: new Map(),
   names: new Map(),
   milestones: [],
   timelineItems: [],
@@ -83,6 +85,7 @@ const pageCopy = {
   home: ['Our little universe', 'A small place for the dates, photos, and ordinary moments you want to keep.'],
   calendar: ['Our calendar', 'Birthdays, anniversaries, and the little dates worth remembering.'],
   gallery: ['Our gallery', 'Your shared photo shelf — private, searchable, and saved with its date.'],
+  voices: ['Voice library', 'Little voice notes and messages, saved with their dates so you can hear them again.'],
   tasks: ['Little plans', 'Small things to do together, one check at a time.'],
   timeline: ['Our timeline', 'A growing story made from your dates, photographs, and little milestones.'],
   jar: ['Date night jar', 'Let the jar choose a simple, fun plan for the two of you.'],
@@ -114,6 +117,7 @@ function showPage(page) {
 
   if (page === 'calendar') renderCalendar();
   if (page === 'gallery') loadPhotos();
+  if (page === 'voices') loadVoices();
   if (page === 'tasks') renderTasks();
   if (page === 'home') renderHome();
   if (page === 'timeline') loadTimeline();
@@ -162,6 +166,7 @@ function setupRealtime() {
     'relationship_timeline_entries',
     'relationship_date_ideas',
     'relationship_daily_checkins',
+    'relationship_voice_records',
   ]) {
     channel.on('postgres_changes', { event: '*', schema: 'public', table }, () => {
       clearTimeout(state.refreshTimer);
@@ -171,6 +176,7 @@ function setupRealtime() {
         if (state.page === 'timeline') await loadTimeline();
         if (state.page === 'jar') await loadDateIdeas();
         if (state.page === 'checkin') await loadCheckins();
+        if (state.page === 'voices') await loadVoices();
       }, 250);
     });
   }
@@ -195,6 +201,8 @@ function resetSpace() {
   state.events = [];
   state.tasks = [];
   state.photos = [];
+  state.voices = [];
+  state.voiceUrls.clear();
   state.milestones = [];
   state.timelineItems = [];
   state.ideas = [];
@@ -503,6 +511,254 @@ function wireCalendar() {
   });
   $('event-close').addEventListener('click', () => $('event-dialog').close());
   $('event-form').addEventListener('submit', saveEvent);
+}
+
+
+/* ----------------------------- Private voice library ----------------------------- */
+const VOICE_BUCKET = 'relationship-voice';
+const MAX_LIBRARY_VOICE_BYTES = 20 * 1024 * 1024;
+const VOICE_MIMES = {
+  'audio/webm': 'webm',
+  'audio/ogg': 'ogg',
+  'audio/mp4': 'm4a',
+  'audio/mpeg': 'mp3',
+  'audio/aac': 'aac',
+  'audio/x-m4a': 'm4a',
+  'audio/wav': 'wav',
+  'audio/x-wav': 'wav',
+  'audio/flac': 'flac',
+};
+
+function voiceFileType(file) {
+  const type = (file.type || '').split(';')[0].trim().toLowerCase();
+  if (VOICE_MIMES[type]) return { type, ext: VOICE_MIMES[type] };
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  const byExt = {
+    webm: ['audio/webm','webm'], ogg: ['audio/ogg','ogg'], opus: ['audio/ogg','ogg'],
+    m4a: ['audio/mp4','m4a'], mp4: ['audio/mp4','mp4'], mp3: ['audio/mpeg','mp3'],
+    aac: ['audio/aac','aac'], wav: ['audio/wav','wav'], flac: ['audio/flac','flac'],
+  };
+  const result = byExt[ext];
+  return result ? { type: result[0], ext: result[1] } : null;
+}
+
+function getAudioDuration(file) {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const audio = new Audio();
+    let settled = false;
+    const finish = (duration) => {
+      if (settled) return;
+      settled = true;
+      URL.revokeObjectURL(url);
+      resolve(Number.isFinite(duration) ? Math.max(0, Math.round(duration)) : 0);
+    };
+    audio.preload = 'metadata';
+    audio.addEventListener('loadedmetadata', () => finish(audio.duration), { once: true });
+    audio.addEventListener('error', () => finish(0), { once: true });
+    audio.src = url;
+  });
+}
+
+function formatVoiceDuration(seconds) {
+  const total = Math.max(0, Number(seconds) || 0);
+  const minutes = Math.floor(total / 60);
+  const remaining = total % 60;
+  return `${minutes}:${String(remaining).padStart(2, '0')}`;
+}
+
+async function loadVoices() {
+  if (!state.user) return;
+  const { data, error } = await sb.from('relationship_voice_records').select('*')
+    .order('voice_date', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(200);
+  if (error) {
+    toast(`Voice library: ${error.message}`);
+    return;
+  }
+
+  state.voices = data || [];
+  state.voiceUrls.clear();
+  if (state.voices.length) {
+    const { data: signed, error: signedError } = await sb.storage.from(VOICE_BUCKET)
+      .createSignedUrls(state.voices.map((voice) => voice.storage_path), 3600);
+    if (signedError) {
+      toast(`Couldn't open saved voices: ${signedError.message}`);
+    } else {
+      for (const item of signed || []) {
+        if (item.signedUrl) state.voiceUrls.set(item.path, item.signedUrl);
+      }
+    }
+  }
+  populateVoiceYears();
+  renderVoices();
+}
+
+function populateVoiceYears() {
+  const select = $('voice-year');
+  const selected = select.value;
+  const years = [...new Set(state.voices.map((voice) => Number(voice.voice_date.slice(0, 4))))]
+    .sort((a, b) => b - a);
+  select.replaceChildren(new Option('All years', ''));
+  years.forEach((year) => select.add(new Option(String(year), String(year))));
+  if (years.includes(Number(selected))) select.value = selected;
+}
+
+function filteredVoices() {
+  const query = $('voice-search').value.trim().toLowerCase();
+  const year = $('voice-year').value;
+  const month = $('voice-month').value;
+  return state.voices.filter((voice) =>
+    (!query || voice.title.toLowerCase().includes(query) || voice.voice_date.includes(query)) &&
+    (!year || voice.voice_date.startsWith(`${year}-`)) &&
+    (!month || voice.voice_date.slice(5, 7) === month)
+  );
+}
+
+function renderVoices() {
+  const grid = $('voice-grid');
+  if (!grid) return;
+  const voices = filteredVoices();
+  $('voice-count').textContent = `${voices.length} ${voices.length === 1 ? 'recording' : 'recordings'}`;
+  grid.replaceChildren();
+
+  if (!voices.length) {
+    grid.append(makeEmpty(state.voices.length
+      ? 'No recordings match these filters.'
+      : 'Your voice library is waiting for its first recording.'));
+    return;
+  }
+
+  for (const voice of voices) {
+    const card = document.createElement('article');
+    card.className = 'voice-library-card';
+
+    const top = document.createElement('div');
+    top.className = 'voice-library-top';
+    const info = document.createElement('div');
+    info.className = 'voice-library-copy';
+    const title = document.createElement('strong');
+    title.textContent = voice.title;
+    const meta = document.createElement('span');
+    meta.textContent = `${formatDate(voice.voice_date, { day: 'numeric', month: 'short', year: 'numeric' })} · ${formatVoiceDuration(voice.duration_seconds)} · ${state.names.get(voice.uploaded_by) || 'One of you'}`;
+    info.append(title, meta);
+    top.append(info);
+
+    if (voice.uploaded_by === state.user.id) {
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'voice-library-delete';
+      remove.setAttribute('aria-label', `Delete ${voice.title}`);
+      remove.innerHTML = icons.trash;
+      remove.addEventListener('click', () => deleteVoiceRecord(voice));
+      top.append(remove);
+    }
+
+    const player = document.createElement('audio');
+    player.className = 'voice-library-player';
+    player.controls = true;
+    player.preload = 'none';
+    player.src = state.voiceUrls.get(voice.storage_path) || '';
+    player.setAttribute('aria-label', `Play ${voice.title}`);
+
+    card.append(top, player);
+    grid.append(card);
+  }
+}
+
+async function deleteVoiceRecord(voice) {
+  if (!confirm('Delete this recording from your shared voice library?')) return;
+  const { error: rowError } = await sb.from('relationship_voice_records').delete().eq('id', voice.id);
+  if (rowError) return toast(`Couldn't remove recording: ${rowError.message}`);
+  const { error: fileError } = await sb.storage.from(VOICE_BUCKET).remove([voice.storage_path]);
+  state.voices = state.voices.filter((item) => item.id !== voice.id);
+  state.voiceUrls.delete(voice.storage_path);
+  populateVoiceYears();
+  renderVoices();
+  if (fileError) toast('The library entry was removed, but its stored audio file could not be cleaned up.');
+  else toast('Recording removed from your shared library.');
+}
+
+async function uploadVoiceFiles() {
+  const input = $('voice-file');
+  const files = [...(input.files || [])];
+  if (!files.length || !state.user) return;
+  const date = $('voice-date').value || dateISO(new Date());
+  const baseTitle = $('voice-title').value.trim();
+  const button = $('voice-upload');
+  button.disabled = true;
+  button.textContent = 'Saving…';
+  let saved = 0;
+
+  for (let index = 0; index < files.length; index++) {
+    const file = files[index];
+    const typeInfo = voiceFileType(file);
+    if (!typeInfo) {
+      toast(`${file.name}: use WEBM, OGG, M4A, MP3, AAC, WAV, or FLAC.`);
+      continue;
+    }
+    if (file.size > MAX_LIBRARY_VOICE_BYTES) {
+      toast(`${file.name}: maximum size is 20 MB.`);
+      continue;
+    }
+
+    const duration = await getAudioDuration(file);
+    const cleanName = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim();
+    const title = (baseTitle
+      ? (files.length > 1 ? `${baseTitle} · ${index + 1}` : baseTitle)
+      : cleanName || 'Voice recording').slice(0, 120);
+    const path = `${state.user.id}/upload-${crypto.randomUUID()}.${typeInfo.ext}`;
+
+    const { error: uploadError } = await sb.storage.from(VOICE_BUCKET).upload(path, file, {
+      contentType: typeInfo.type,
+      cacheControl: '3600',
+      upsert: false,
+    });
+    if (uploadError) {
+      toast(`Couldn't upload ${file.name}: ${uploadError.message}`);
+      continue;
+    }
+
+    const { error: rowError } = await sb.from('relationship_voice_records').insert({
+      storage_path: path,
+      title,
+      voice_date: date,
+      duration_seconds: duration,
+      uploaded_by: state.user.id,
+    });
+    if (rowError) {
+      await sb.storage.from(VOICE_BUCKET).remove([path]);
+      toast(`Couldn't save ${file.name}: ${rowError.message}`);
+      continue;
+    }
+    saved += 1;
+  }
+
+  input.value = '';
+  $('voice-file-count').textContent = 'No recordings selected';
+  button.disabled = true;
+  button.textContent = 'Save recordings';
+  if (saved) {
+    $('voice-title').value = '';
+    await loadVoices();
+    toast(`${saved} ${saved === 1 ? 'recording' : 'recordings'} saved to your shared voice library.`);
+  }
+}
+
+function wireVoices() {
+  $('voice-select').addEventListener('click', () => $('voice-file').click());
+  $('voice-file').addEventListener('change', () => {
+    const files = [...$('voice-file').files];
+    $('voice-file-count').textContent = files.length
+      ? `${files.length} ${files.length === 1 ? 'recording selected' : 'recordings selected'}`
+      : 'No recordings selected';
+    $('voice-upload').disabled = !files.length;
+  });
+  $('voice-upload').addEventListener('click', uploadVoiceFiles);
+  $('voice-search').addEventListener('input', renderVoices);
+  $('voice-year').addEventListener('change', renderVoices);
+  $('voice-month').addEventListener('change', renderVoices);
 }
 
 /* ----------------------------- Shared to-do list ----------------------------- */
@@ -1282,6 +1538,7 @@ function wireAll() {
   wireCalendar();
   wireTasks();
   wireGallery();
+  wireVoices();
   wireTimeline();
   wireDateJar();
   wireCheckins();
