@@ -14,6 +14,7 @@ const state = {
   events: [],
   tasks: [],
   photos: [],
+  editingPhotoId: null,
   voices: [],
   voiceUrls: new Map(),
   names: new Map(),
@@ -38,6 +39,7 @@ const icons = {
   chat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-1-4.5A7.5 7.5 0 1 1 20 11.5Z"/><path d="M8 11h8M8 14h5"/></svg>',
   plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12h10l1-12M9 7V4h6v3"/></svg>',
+  edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m14 5 5 5M4 20l4.5-1 10.8-10.8a2.1 2.1 0 0 0-3-3L5.5 16z"/><path d="M13 20h7"/></svg>',
   check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg>',
   left: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>',
   right: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>',
@@ -937,18 +939,64 @@ async function renderGallery() {
     meta.append(copy);
 
     if (photo.uploaded_by === state.user.id) {
+      const actions = document.createElement('div');
+      actions.className = 'gallery-photo-actions';
+
+      const edit = document.createElement('button');
+      edit.type = 'button';
+      edit.className = 'gallery-edit';
+      edit.setAttribute('aria-label', 'Edit photo caption');
+      edit.title = 'Edit caption';
+      edit.innerHTML = icons.edit;
+      edit.addEventListener('click', () => openCaptionEditor(photo));
+
       const remove = document.createElement('button');
       remove.type = 'button';
       remove.className = 'gallery-remove';
       remove.setAttribute('aria-label', 'Delete this photo');
       remove.innerHTML = icons.trash;
       remove.addEventListener('click', () => deletePhoto(photo));
-      meta.append(remove);
+
+      actions.append(edit, remove);
+      meta.append(actions);
     }
 
     card.append(open, meta);
     grid.append(card);
   }
+}
+
+
+function openCaptionEditor(photo) {
+  state.editingPhotoId = photo.id;
+  $('gallery-caption-input').value = photo.caption || '';
+  $('gallery-caption-dialog').showModal();
+  $('gallery-caption-input').focus();
+}
+
+async function savePhotoCaption(event) {
+  event.preventDefault();
+  if (!state.editingPhotoId) return;
+  const caption = $('gallery-caption-input').value.trim();
+  const photoId = state.editingPhotoId;
+  const { data, error } = await sb.from('relationship_photos')
+    .update({ caption })
+    .eq('id', photoId)
+    .select()
+    .single();
+
+  if (error) {
+    toast(`Couldn't update caption: ${error.message}`);
+    return;
+  }
+
+  state.photos = state.photos.map((photo) => photo.id === photoId ? data : photo);
+  state.editingPhotoId = null;
+  $('gallery-caption-dialog').close();
+  populateGalleryYears();
+  renderGallery();
+  if (state.page === 'timeline') await loadTimeline();
+  toast('Photo caption updated.');
 }
 
 function openGalleryPhoto(url, photo) {
@@ -1041,6 +1089,12 @@ function wireGallery() {
     $('gallery-upload').disabled = !files.length;
   });
   $('gallery-upload').addEventListener('click', uploadPhotos);
+  $('gallery-caption-form').addEventListener('submit', savePhotoCaption);
+  $('gallery-caption-cancel').addEventListener('click', () => {
+    state.editingPhotoId = null;
+    $('gallery-caption-dialog').close();
+  });
+  $('gallery-caption-dialog').addEventListener('close', () => { state.editingPhotoId = null; });
   $('gallery-search').addEventListener('input', renderGallery);
   $('gallery-year').addEventListener('change', renderGallery);
   $('gallery-month').addEventListener('change', renderGallery);
