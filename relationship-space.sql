@@ -1,4 +1,10 @@
 -- Lovers: shared calendar, private photo gallery, and shared to-do list.
+-- Optimized lookup for unread incoming chat messages used by the Realtime recovery fallback.
+create index if not exists messages_unread_inbox_idx
+  on public.messages (receiver_id, id asc)
+  where read_at is null and deleted_at is null;
+
+
 -- This script is idempotent and has already been applied to the connected Supabase project.
 
 -- Private allow-list: only these two existing profiles can access the shared space.
