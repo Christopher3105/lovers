@@ -1,6 +1,28 @@
 -- Lovers: shared calendar, private photo gallery, and shared to-do list.
 -- This script is idempotent and has already been applied to the connected Supabase project.
 
+-- Private allow-list: only these two existing profiles can access the shared space.
+create table if not exists public.relationship_members (
+  user_id uuid primary key references public.profiles(id) on delete cascade,
+  added_at timestamptz not null default now()
+);
+alter table public.relationship_members enable row level security;
+drop policy if exists "Users can see their own relationship membership" on public.relationship_members;
+create policy "Users can see their own relationship membership"
+  on public.relationship_members for select to authenticated
+  using (user_id = (select auth.uid()));
+grant select on public.relationship_members to authenticated;
+
+do $
+begin
+  if (select count(*) from public.profiles) <> 2 then
+    raise exception 'Expected exactly two existing profiles before seeding relationship members.';
+  end if;
+  insert into public.relationship_members (user_id)
+  select id from public.profiles
+  on conflict (user_id) do nothing;
+end $;
+
 create table if not exists public.relationship_events (
   id uuid primary key default gen_random_uuid(),
   title text not null check (char_length(btrim(title)) between 1 and 100),
@@ -52,62 +74,98 @@ alter table public.relationship_photos enable row level security;
 drop policy if exists "Couple members can read relationship events" on public.relationship_events;
 create policy "Couple members can read relationship events"
   on public.relationship_events for select to authenticated
-  using (exists (select 1 from public.profiles p where p.id = (select auth.uid())));
+  using (exists (
+    select 1 from public.relationship_members m
+    where m.user_id = (select auth.uid())
+  ));
 
 drop policy if exists "Couple members can add relationship events" on public.relationship_events;
 create policy "Couple members can add relationship events"
   on public.relationship_events for insert to authenticated
   with check (
     created_by = (select auth.uid())
-    and exists (select 1 from public.profiles p where p.id = (select auth.uid()))
+    and exists (
+    select 1 from public.relationship_members m
+    where m.user_id = (select auth.uid())
+  )
   );
 
 drop policy if exists "Couple members can update relationship events" on public.relationship_events;
 create policy "Couple members can update relationship events"
   on public.relationship_events for update to authenticated
-  using (exists (select 1 from public.profiles p where p.id = (select auth.uid())))
-  with check (exists (select 1 from public.profiles p where p.id = (select auth.uid())));
+  using (exists (
+    select 1 from public.relationship_members m
+    where m.user_id = (select auth.uid())
+  ))
+  with check (exists (
+    select 1 from public.relationship_members m
+    where m.user_id = (select auth.uid())
+  ));
 
 drop policy if exists "Couple members can delete relationship events" on public.relationship_events;
 create policy "Couple members can delete relationship events"
   on public.relationship_events for delete to authenticated
-  using (exists (select 1 from public.profiles p where p.id = (select auth.uid())));
+  using (exists (
+    select 1 from public.relationship_members m
+    where m.user_id = (select auth.uid())
+  ));
 
 drop policy if exists "Couple members can read shared tasks" on public.relationship_tasks;
 create policy "Couple members can read shared tasks"
   on public.relationship_tasks for select to authenticated
-  using (exists (select 1 from public.profiles p where p.id = (select auth.uid())));
+  using (exists (
+    select 1 from public.relationship_members m
+    where m.user_id = (select auth.uid())
+  ));
 
 drop policy if exists "Couple members can add shared tasks" on public.relationship_tasks;
 create policy "Couple members can add shared tasks"
   on public.relationship_tasks for insert to authenticated
   with check (
     created_by = (select auth.uid())
-    and exists (select 1 from public.profiles p where p.id = (select auth.uid()))
+    and exists (
+    select 1 from public.relationship_members m
+    where m.user_id = (select auth.uid())
+  )
   );
 
 drop policy if exists "Couple members can update shared tasks" on public.relationship_tasks;
 create policy "Couple members can update shared tasks"
   on public.relationship_tasks for update to authenticated
-  using (exists (select 1 from public.profiles p where p.id = (select auth.uid())))
-  with check (exists (select 1 from public.profiles p where p.id = (select auth.uid())));
+  using (exists (
+    select 1 from public.relationship_members m
+    where m.user_id = (select auth.uid())
+  ))
+  with check (exists (
+    select 1 from public.relationship_members m
+    where m.user_id = (select auth.uid())
+  ));
 
 drop policy if exists "Couple members can delete shared tasks" on public.relationship_tasks;
 create policy "Couple members can delete shared tasks"
   on public.relationship_tasks for delete to authenticated
-  using (exists (select 1 from public.profiles p where p.id = (select auth.uid())));
+  using (exists (
+    select 1 from public.relationship_members m
+    where m.user_id = (select auth.uid())
+  ));
 
 drop policy if exists "Couple members can read shared gallery" on public.relationship_photos;
 create policy "Couple members can read shared gallery"
   on public.relationship_photos for select to authenticated
-  using (exists (select 1 from public.profiles p where p.id = (select auth.uid())));
+  using (exists (
+    select 1 from public.relationship_members m
+    where m.user_id = (select auth.uid())
+  ));
 
 drop policy if exists "Users add their own gallery metadata" on public.relationship_photos;
 create policy "Users add their own gallery metadata"
   on public.relationship_photos for insert to authenticated
   with check (
     uploaded_by = (select auth.uid())
-    and exists (select 1 from public.profiles p where p.id = (select auth.uid()))
+    and exists (
+    select 1 from public.relationship_members m
+    where m.user_id = (select auth.uid())
+  )
   );
 
 drop policy if exists "Users remove their own gallery metadata" on public.relationship_photos;
@@ -145,7 +203,10 @@ create policy "Couple members can view gallery objects"
   on storage.objects for select to authenticated
   using (
     bucket_id = 'relationship-gallery'
-    and exists (select 1 from public.profiles p where p.id = (select auth.uid()))
+    and exists (
+    select 1 from public.relationship_members m
+    where m.user_id = (select auth.uid())
+  )
   );
 
 drop policy if exists "Users upload their own gallery objects" on storage.objects;
@@ -154,7 +215,10 @@ create policy "Users upload their own gallery objects"
   with check (
     bucket_id = 'relationship-gallery'
     and (storage.foldername(name))[1] = (select auth.uid())::text
-    and exists (select 1 from public.profiles p where p.id = (select auth.uid()))
+    and exists (
+    select 1 from public.relationship_members m
+    where m.user_id = (select auth.uid())
+  )
   );
 
 drop policy if exists "Users delete their own gallery objects" on storage.objects;
