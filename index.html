@@ -120,6 +120,14 @@
         </button>
       </header>
 
+      <div id="pinned-banner" class="pinned-banner" hidden>
+        <button id="pinned-banner-open" class="pinned-banner-open" type="button">
+          <span class="pinned-banner-label" id="pinned-banner-label">PINNED MESSAGE</span>
+          <strong id="pinned-banner-text"></strong>
+        </button>
+        <button id="pinned-banner-saved" class="pinned-banner-saved" type="button">Saved</button>
+      </div>
+
       <div id="stage" class="stage" hidden>
         <div id="messages" class="messages" role="log" aria-live="polite"></div>
         <button id="jump" class="jump" type="button" hidden>
@@ -498,6 +506,7 @@
                   <option value="notes">Shared notes</option>
                   <option value="dates">Calendar dates</option>
                   <option value="tasks">To-do items</option>
+                  <option value="people">People</option>
                 </select>
               </label>
               <button class="space-button" type="submit">Search</button>

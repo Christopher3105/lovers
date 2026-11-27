@@ -1140,3 +1140,50 @@ html, body { background: #05040a; }
   .mobile-space-nav::-webkit-scrollbar { display: none; }
   .mobile-space-nav button { flex: 0 0 68px; min-width: 68px; }
 }
+
+
+/* Pinned message bar above each active conversation */
+.pinned-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 16px;
+  border-bottom: 1px solid rgb(255 255 255 / .07);
+  background: linear-gradient(90deg, rgb(20 120 255 / .10), rgb(255 22 143 / .08));
+}
+.pinned-banner[hidden] { display: none !important; }
+.pinned-banner-open {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  padding: 0;
+  text-align: left;
+}
+.pinned-banner-label {
+  color: var(--blue-hi);
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: .14em;
+}
+.pinned-banner-open strong {
+  color: var(--bone);
+  font-size: 12px;
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pinned-banner-saved {
+  flex: none;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: #d8c9dd;
+  font-size: 10px;
+}
+.msg.search-highlight .bubble {
+  outline: 2px solid var(--blue-hi);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 5px rgb(20 120 255 / .14), 0 0 30px rgb(20 120 255 / .2);
+}

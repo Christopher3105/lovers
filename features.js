@@ -1858,6 +1858,16 @@ async function runGlobalSearch(event) {
       .is('deleted_at', null).ilike('body', pattern)
       .order('created_at', { ascending: false }).limit(12));
   }
+  if (kind === 'all' || kind === 'people') {
+    add('profile', 'profiles', sb.from('profiles')
+      .select('id,display_name,username')
+      .neq('id', state.user.id).ilike('display_name', pattern)
+      .order('display_name', { ascending: true }).limit(10));
+    add('profile', 'profiles', sb.from('profiles')
+      .select('id,display_name,username')
+      .neq('id', state.user.id).ilike('username', pattern)
+      .order('username', { ascending: true }).limit(10));
+  }
   if (kind === 'all' || kind === 'photos') {
     add('photo', 'photos', sb.from('relationship_photos')
       .select('id,caption,photo_date,uploaded_by')
@@ -1915,10 +1925,12 @@ function renderGlobalSearch(term) {
     'date-title': 'CALENDAR DATE',
     'date-description': 'CALENDAR DATE',
     task: 'TO-DO ITEM',
+    profile: 'PERSON',
   };
   const detailFor = (type, row) => {
     if (type === 'message') return row.kind === 'text' ? row.body : row.kind === 'image' ? 'Photo message' : row.kind === 'audio' ? 'Voice message' : 'Sticker message';
     if (type === 'photo') return row.caption || 'Saved photo';
+    if (type === 'profile') return `@${row.username || ''}`;
     if (type.startsWith('note')) return row.content || 'Shared note';
     if (type.startsWith('date')) return row.description || 'Calendar date';
     return row.done ? `Completed · ${row.title}` : row.title;
@@ -1939,12 +1951,14 @@ function renderGlobalSearch(term) {
       : type === 'photo' ? (row.caption || 'Saved photo')
       : type.startsWith('note') ? row.title
       : type.startsWith('date') ? row.title
+      : type === 'profile' ? (row.display_name || row.username || 'Person')
       : row.title;
     const detail = document.createElement('p');
     detail.textContent = type === 'message' ? `${state.names.get(row.sender_id) || 'One of you'} · ${new Date(row.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}`
       : type === 'photo' ? formatDate(row.photo_date)
       : type.startsWith('note') ? `Updated ${new Date(row.updated_at).toLocaleDateString()}`
       : type.startsWith('date') ? formatDate(row.event_date)
+      : type === 'profile' ? `@${row.username || ''}`
       : row.done ? 'Completed' : 'To do';
     const meta = document.createElement('small');
     meta.textContent = detailFor(type, row).slice(0, 220);
@@ -1960,6 +1974,7 @@ function renderGlobalSearch(term) {
       } else if (type === 'photo') showPage('gallery');
       else if (type.startsWith('note')) showPage('notes');
       else if (type.startsWith('date')) showPage('calendar');
+      else if (type === 'profile') window.dispatchEvent(new CustomEvent('lovers:open-conversation', { detail: { peerId: row.id } }));
       else showPage('tasks');
     });
     card.append(copy, open);
@@ -1999,6 +2014,7 @@ function wireAll() {
   window.addEventListener('lovers:saved-changed', () => {
     if (state.page === 'saved') loadSavedMessages();
   });
+  window.addEventListener('lovers:show-saved', () => showPage('saved'));
 }
 
 wireAll();

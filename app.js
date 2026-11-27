@@ -38,7 +38,9 @@ const el = {
   app: $('#app'), contacts: $('#contact-list'), meAvatar: $('#me-avatar'), meName: $('#me-name'),
   settingsBtn: $('#settings-btn'),
   chatEmpty: $('#chat-empty'),
-  chatHead: $('#chat-head'), back: $('#back-btn'), peerBtn: $('#peer-btn'), peerSong: $('#peer-song'),
+  chatHead: $('#chat-head'), pinnedBanner: $('#pinned-banner'), pinnedOpen: $('#pinned-banner-open'),
+  pinnedLabel: $('#pinned-banner-label'), pinnedText: $('#pinned-banner-text'), pinnedSaved: $('#pinned-banner-saved'),
+  back: $('#back-btn'), peerBtn: $('#peer-btn'), peerSong: $('#peer-song'),
   peerAvatar: $('#peer-avatar'), peerName: $('#peer-name'), peerStatus: $('#peer-status'),
   stage: $('#stage'), messages: $('#messages'), jump: $('#jump'), dropHint: $('#drop-hint'),
   emojiTray: $('#emoji-tray'), stickerTray: $('#sticker-tray'), stickerGrid: $('#sticker-grid'),
@@ -999,6 +1001,7 @@ function showChatPane(open) {
   el.chatHead.hidden = !open;
   el.stage.hidden = !open;
   el.composer.hidden = !open;
+  if (el.pinnedBanner) el.pinnedBanner.hidden = !open;
   if (!open) { closeTrays(); cancelReply(); }
 }
 
@@ -1044,6 +1047,7 @@ async function openConvo(id) {
     scrollToBottom();
   }
   markRead(id);
+  refreshPinnedBanner(id);
   if (!isTouch) el.text.focus();
 }
 
@@ -1509,6 +1513,45 @@ async function saveMessageVoiceToLibrary(m) {
   } catch (error) {
     toast(`Couldn't save voice message: ${error.message || 'Unknown error'}`);
   }
+}
+
+async function refreshPinnedBanner(peerId = state.activeId) {
+  if (!state.me || !peerId || !el.pinnedBanner) {
+    if (el.pinnedBanner) el.pinnedBanner.hidden = true;
+    return;
+  }
+  const { data: savedRows, error: savedError } = await sb.from('relationship_saved_messages')
+    .select('message_id').eq('user_id', state.me.id).eq('pinned', true);
+  if (savedError) {
+    el.pinnedBanner.hidden = true;
+    return;
+  }
+  const ids = (savedRows || []).map((row) => row.message_id);
+  if (!ids.length) {
+    el.pinnedBanner.hidden = true;
+    return;
+  }
+  const me = state.me.id;
+  const { data: messages, error } = await sb.from('messages')
+    .select('id,sender_id,receiver_id,kind,body,created_at,deleted_at')
+    .in('id', ids)
+    .or(`and(sender_id.eq.${me},receiver_id.eq.${peerId}),and(sender_id.eq.${peerId},receiver_id.eq.${me})`)
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false });
+  if (error || state.activeId !== peerId) {
+    el.pinnedBanner.hidden = true;
+    return;
+  }
+  const pinned = messages || [];
+  if (!pinned.length) {
+    el.pinnedBanner.hidden = true;
+    return;
+  }
+  const first = pinned[0];
+  el.pinnedOpen.dataset.messageId = String(first.id);
+  el.pinnedLabel.textContent = pinned.length > 1 ? `PINNED · ${pinned.length} MESSAGES` : 'PINNED MESSAGE';
+  el.pinnedText.textContent = snippet(first);
+  el.pinnedBanner.hidden = false;
 }
 
 async function changeMessageBookmark(m, action) {
@@ -2356,6 +2399,21 @@ function notify(title, body, fromId) {
 // ============================================================ EVENTS
 function wireEvents() {
   window.addEventListener('lovers:open-message', (event) => jumpToMessage(event.detail));
+  window.addEventListener('lovers:open-conversation', (event) => {
+    const peerId = event.detail?.peerId;
+    if (peerId && state.contacts.has(peerId)) {
+      window.dispatchEvent(new CustomEvent('lovers:show-chat'));
+      openConvo(peerId);
+    }
+  });
+  window.addEventListener('lovers:saved-changed', () => {
+    if (state.activeId) refreshPinnedBanner(state.activeId);
+  });
+  el.pinnedOpen?.addEventListener('click', () => {
+    const messageId = Number(el.pinnedOpen.dataset.messageId);
+    if (messageId && state.activeId) jumpToMessage({ messageId, peerId: state.activeId });
+  });
+  el.pinnedSaved?.addEventListener('click', () => window.dispatchEvent(new CustomEvent('lovers:show-saved')));
   el.loginForm.addEventListener('submit', login);
   el.back.addEventListener('click', () => {
     el.app.classList.remove('chat-open');
