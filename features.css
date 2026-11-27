@@ -987,3 +987,29 @@ html, body { background: #05040a; }
   .voice-upload .space-inline { flex-direction: column; align-items: stretch; }
   .voice-upload .space-inline .space-button { width: 100%; }
 }
+
+/* Gallery caption editing controls */
+.gallery-photo-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.gallery-edit {
+  display: grid;
+  place-items: center;
+  padding: 6px;
+  border-radius: 8px;
+  color: var(--blue-hi);
+  transition: background .15s, color .15s;
+}
+.gallery-edit:hover {
+  color: #fff;
+  background: rgb(20 120 255 / .14);
+}
+.gallery-edit svg { width: 15px; height: 15px; }
+.gallery-edit:focus-visible, .gallery-remove:focus-visible {
+  outline: 2px solid var(--pink-hi);
+  outline-offset: 2px;
+}
+
