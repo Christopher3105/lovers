@@ -74,6 +74,7 @@
         <button class="space-nav-button active" type="button" data-space="chat" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-1-4.5A7.5 7.5 0 1 1 20 11.5Z"/><path d="M8 11h8M8 14h5"/></svg> Chat</button>
         <button class="space-nav-button" type="button" data-space="saved"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4.8A1.8 1.8 0 0 1 7.8 3h8.4A1.8 1.8 0 0 1 18 4.8V21l-6-4-6 4z"/></svg> Saved messages</button>
         <button class="space-nav-button" type="button" data-space="notes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg> Shared notes</button>
+        <button class="space-nav-button" type="button" data-space="export"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m-5-5 5 5 5-5"/><path d="M4 17v3h16v-3"/></svg> Export data</button>
 
       </nav>
 
@@ -451,6 +452,90 @@
           </article>
           <div id="notes-list" class="notes-grid"></div>
         </section>
+
+        <section id="space-export" class="space-view" hidden>
+          <div class="export-layout">
+            <article class="space-card export-intro-card">
+              <p class="space-eyebrow">YOUR DATA · YOUR CHOICE</p>
+              <h2>Choose what goes into your ZIP.</h2>
+              <p class="space-muted">Pick the sections you want, then set an optional date range. Leave both dates empty to include all dates.</p>
+            </article>
+
+            <form id="export-form" class="space-card export-config-card">
+              <div class="export-picker-head">
+                <div>
+                  <p class="space-eyebrow">INCLUDE</p>
+                  <h3>What should be exported?</h3>
+                  <p id="export-selection-count" class="space-muted">9 sections selected</p>
+                </div>
+                <label class="export-select-all"><input id="export-select-all" type="checkbox" checked> <span>Select all</span></label>
+              </div>
+
+              <div class="export-category-grid">
+                <label class="export-choice">
+                  <input type="checkbox" name="export-category" value="account" checked>
+                  <span><strong>Account &amp; profiles</strong><small>Profile details, membership, avatars and profile music.</small></span>
+                </label>
+                <label class="export-choice">
+                  <input type="checkbox" name="export-category" value="chat" checked>
+                  <span><strong>Chats &amp; messages</strong><small>Messages, reactions, photos and voice-message attachments.</small></span>
+                </label>
+                <label class="export-choice">
+                  <input type="checkbox" name="export-category" value="calendar" checked>
+                  <span><strong>Calendar &amp; timeline</strong><small>Events, milestones and older saved planning data.</small></span>
+                </label>
+                <label class="export-choice">
+                  <input type="checkbox" name="export-category" value="gallery" checked>
+                  <span><strong>Photo gallery</strong><small>Captions, dates and the original photo files.</small></span>
+                </label>
+                <label class="export-choice">
+                  <input type="checkbox" name="export-category" value="voice" checked>
+                  <span><strong>Voice library</strong><small>Saved voice notes and their audio files.</small></span>
+                </label>
+                <label class="export-choice">
+                  <input type="checkbox" name="export-category" value="checkins" checked>
+                  <span><strong>Daily check-ins</strong><small>Mood, energy, highlights and notes.</small></span>
+                </label>
+                <label class="export-choice">
+                  <input type="checkbox" name="export-category" value="notes" checked>
+                  <span><strong>Shared notes</strong><small>Notebook titles, content and dates.</small></span>
+                </label>
+                <label class="export-choice">
+                  <input type="checkbox" name="export-category" value="saved" checked>
+                  <span><strong>Saved messages</strong><small>Your saved and pinned messages, with their content.</small></span>
+                </label>
+                <label class="export-choice">
+                  <input type="checkbox" name="export-category" value="stickers" checked>
+                  <span><strong>Custom stickers</strong><small>Your sticker list and the sticker image files.</small></span>
+                </label>
+              </div>
+
+              <div class="export-date-panel">
+                <div>
+                  <p class="space-eyebrow">OPTIONAL DATE RANGE</p>
+                  <h3>Export records between two dates.</h3>
+                  <p class="space-muted">Both dates are included. Each section uses its own date, such as the message date, event date, photo date or check-in date. Files attached to selected records are included too. Current profile details are included whenever Account &amp; profiles is selected.</p>
+                </div>
+                <div class="export-date-grid">
+                  <label class="export-date-field"><span>From</span><input id="export-from" type="date"></label>
+                  <label class="export-date-field"><span>To</span><input id="export-to" type="date"></label>
+                </div>
+              </div>
+
+              <div class="export-privacy-note">
+                <strong>Private by design</strong>
+                <span>The ZIP is assembled in this browser. Nothing is deleted or uploaded by this export. Keep the file somewhere private.</span>
+              </div>
+
+              <div class="export-submit-row">
+                <button id="export-data-btn" class="space-button" type="submit">Create ZIP archive</button>
+              </div>
+              <progress id="export-progress" max="100" value="0" hidden></progress>
+              <p id="export-status" class="export-status" role="status" aria-live="polite"></p>
+            </form>
+          </div>
+        </section>
+
       </div>
 
       <div id="mobile-more-menu" class="mobile-more-menu" hidden>
@@ -459,6 +544,7 @@
   <button type="button" data-space="checkin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M20 8c0 6-8 12-8 12S4 14 4 8a4 4 0 0 1 8-1 4 4 0 0 1 8 1Z"/></svg> Daily check-in</button>
   <button type="button" data-space="saved"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 4h12v17l-6-4-6 4z"/></svg> Saved messages</button>
   <button type="button" data-space="notes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M7 3h7l5 5v13H7zM14 3v5h5M9 13h6M9 17h6"/></svg> Shared notes</button>
+  <button type="button" data-space="export"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v12m-5-5 5 5 5-5"/><path d="M4 17v3h16v-3"/></svg> Export data</button>
 </div>
 <nav class="mobile-space-nav" aria-label="Shared space pages">
   <button type="button" data-space="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span>Home</span></button>
@@ -664,8 +750,6 @@
         <span class="switch-ui" aria-hidden="true"></span>
         <span>Show a notification for new messages when this tab is in the background</span>
       </label>
-
-      <section class="export-panel" aria-labelledby="export-title"><p class="space-eyebrow">YOUR DATA</p><h3 id="export-title">Keep a copy of Lovers.</h3><p>Download messages, profiles, calendar, notes and private media as one ZIP file. It is created on this device.</p><button id="export-data-btn" class="space-button secondary" type="button">Download everything (.zip)</button><progress id="export-progress" max="100" value="0" hidden></progress><p id="export-status" class="export-status" role="status" aria-live="polite"></p></section>
       <p id="set-msg" class="form-error" role="alert"></p>
 
       <div class="sheet-actions">

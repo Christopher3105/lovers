@@ -1274,3 +1274,44 @@ html, body { background: #05040a; }
 .export-panel .space-button{width:100%}
 .export-panel progress{display:block;width:100%;height:8px;margin-top:13px;accent-color:var(--pink)}
 .export-status{min-height:0;overflow-wrap:anywhere}.export-status:empty{display:none}
+
+
+/* Personal data export page */
+.export-layout{display:grid;gap:14px;max-width:1000px}
+.export-intro-card .space-muted{max-width:650px;margin:8px 0 0;font-size:13px;line-height:1.6}
+.export-config-card{display:grid;gap:20px}
+.export-picker-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.export-picker-head h3,.export-date-panel h3{margin:0;color:var(--bone);font-size:16px}
+.export-picker-head .space-eyebrow,.export-date-panel .space-eyebrow{margin-bottom:5px}
+.export-selection-count{margin:5px 0 0;font-size:12px}
+.export-select-all{display:flex;align-items:center;gap:8px;white-space:nowrap;color:#d8c8dc;font-size:12px;font-weight:700}
+.export-select-all input,.export-choice input{appearance:none;width:18px;height:18px;flex:none;margin:1px 0 0;border:1px solid rgb(255 255 255 / .25);border-radius:5px;background:rgb(255 255 255 / .04);cursor:pointer}
+.export-select-all input:checked,.export-choice input:checked{border-color:var(--pink);background:var(--pink)}
+.export-select-all input:checked:after,.export-choice input:checked:after{content:"✓";display:block;color:#fff;font-size:13px;line-height:16px;text-align:center;font-weight:800}
+.export-category-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.export-choice{display:flex;align-items:flex-start;gap:11px;min-width:0;padding:14px;border:1px solid rgb(255 255 255 / .09);border-radius:14px;background:rgb(255 255 255 / .025);cursor:pointer;transition:border-color .18s,background .18s}
+.export-choice:hover{border-color:rgb(255 22 143 / .3);background:rgb(255 22 143 / .045)}
+.export-choice input{margin-top:2px}
+.export-choice span{display:grid;gap:4px;min-width:0}
+.export-choice strong{color:var(--bone);font-size:13px;font-weight:750}
+.export-choice small{color:#a997ad;font-size:11px;line-height:1.45}
+.export-date-panel{display:grid;gap:15px;padding-top:18px;border-top:1px solid rgb(255 255 255 / .08)}
+.export-date-panel .space-muted{max-width:760px;margin:7px 0 0;font-size:12px;line-height:1.6}
+.export-date-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;max-width:620px}
+.export-date-field{display:grid;gap:7px;color:#d9cbdc;font-size:12px;font-weight:700}
+.export-date-field input{width:100%;min-height:43px;padding:10px 12px;border:1px solid rgb(255 255 255 / .13);border-radius:11px;background:rgb(0 0 0 / .22);color:var(--bone);color-scheme:dark;font:inherit}
+.export-privacy-note{display:grid;gap:4px;padding:13px 15px;border:1px solid rgb(20 120 255 / .16);border-radius:12px;background:rgb(20 120 255 / .055)}
+.export-privacy-note strong{color:#d7d5ff;font-size:12px}
+.export-privacy-note span{color:#a99eb0;font-size:11px;line-height:1.5}
+.export-submit-row{display:flex;justify-content:flex-start}
+.export-submit-row .space-button{min-width:210px;justify-content:center}
+#export-progress{display:block;width:100%;height:8px;margin-top:0;accent-color:var(--pink)}
+.export-status{min-height:0;margin:0;color:#d8c8dc;font-size:12px;line-height:1.5;overflow-wrap:anywhere}
+.export-status:empty{display:none}
+@media(max-width:760px){
+ .export-config-card{padding:16px;gap:17px}
+ .export-picker-head{align-items:center}
+ .export-category-grid{grid-template-columns:minmax(0,1fr)}
+ .export-date-grid{grid-template-columns:minmax(0,1fr)}
+ .export-submit-row .space-button{width:100%}
+}

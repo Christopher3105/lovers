@@ -1,5 +1,5 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import { SUPABASE_URL, SUPABASE_KEY } from './config.js';
+import { SUPABASE_URL, SUPABASE_KEY, IMAGE_BUCKET, PROFILE_BUCKET } from './config.js';
 
 const BUCKET = 'relationship-gallery';
 const MAX_PHOTO_BYTES = 12 * 1024 * 1024;
@@ -89,7 +89,7 @@ function setActiveNavigation(page) {
     if (active) button.setAttribute('aria-current', 'page');
     else button.removeAttribute('aria-current');
   });
-  $('mobile-more-toggle')?.classList.toggle('active', ['voices', 'timeline', 'checkin', 'saved', 'notes'].includes(page));
+  $('mobile-more-toggle')?.classList.toggle('active', ['voices', 'timeline', 'checkin', 'saved', 'notes', 'export'].includes(page));
 }
 
 const pageCopy = {
@@ -102,6 +102,7 @@ const pageCopy = {
   search: ['Search everything', 'Find messages, photo captions, notes, calendar dates and people.'],
   saved: ['Saved messages', 'Your personal shelf for messages you want to find again.'],
   notes: ['Shared notes', 'A little notebook both of you can read and update.'],
+  export: ['Export your data', 'Choose the parts of Lovers you want to keep, and the dates to include.'],
 };
 
 function openGlobalSearch() {
@@ -1991,101 +1992,345 @@ function wireSearch() {
 }
 
 /* ----------------------------- Private data export ----------------------------- */
-const EXPORT_TABLES = [
- ['profiles',['id']],['relationship_members',['user_id']],['messages',['id']],
- ['reactions',['message_id','user_id']],['custom_stickers',['id']],['relationship_events',['id']],
- ['relationship_tasks',['id']],['relationship_photos',['id']],['relationship_timeline_entries',['id']],
- ['relationship_date_ideas',['id']],['relationship_daily_checkins',['id']],['relationship_voice_records',['id']],
- ['relationship_notes',['id']],['relationship_saved_messages',['id']],
+const EXPORT_CATEGORIES = [
+  {
+    id: 'account',
+    label: 'Account & profiles',
+    tables: [
+      { name: 'profiles', keys: ['id'] },
+      { name: 'relationship_members', keys: ['user_id'] },
+    ],
+    files: [{ table: 'profiles', bucket: PROFILE_BUCKET, columns: ['avatar_path', 'song_path'] }],
+  },
+  {
+    id: 'chat',
+    label: 'Chats & messages',
+    tables: [
+      { name: 'messages', keys: ['id'], dateColumn: 'created_at', dateType: 'timestamp' },
+      { name: 'reactions', keys: ['message_id', 'user_id'], dateColumn: 'created_at', dateType: 'timestamp' },
+    ],
+    files: [{ table: 'messages', bucket: IMAGE_BUCKET, columns: ['image_path'] }],
+  },
+  {
+    id: 'calendar',
+    label: 'Calendar & timeline',
+    tables: [
+      { name: 'relationship_events', keys: ['id'], dateColumn: 'event_date', dateType: 'date' },
+      { name: 'relationship_timeline_entries', keys: ['id'], dateColumn: 'milestone_date', dateType: 'date' },
+      { name: 'relationship_date_ideas', keys: ['id'], dateColumn: 'created_at', dateType: 'timestamp' },
+      { name: 'relationship_tasks', keys: ['id'], dateColumn: 'created_at', dateType: 'timestamp' },
+    ],
+    files: [],
+  },
+  {
+    id: 'gallery',
+    label: 'Photo gallery',
+    tables: [
+      { name: 'relationship_photos', keys: ['id'], dateColumn: 'photo_date', dateType: 'date' },
+    ],
+    files: [{ table: 'relationship_photos', bucket: BUCKET, columns: ['storage_path'] }],
+  },
+  {
+    id: 'voice',
+    label: 'Voice library',
+    tables: [
+      { name: 'relationship_voice_records', keys: ['id'], dateColumn: 'voice_date', dateType: 'date' },
+    ],
+    files: [{ table: 'relationship_voice_records', bucket: 'relationship-voice', columns: ['storage_path'] }],
+  },
+  {
+    id: 'checkins',
+    label: 'Daily check-ins',
+    tables: [
+      { name: 'relationship_daily_checkins', keys: ['id'], dateColumn: 'checkin_date', dateType: 'date' },
+    ],
+    files: [],
+  },
+  {
+    id: 'notes',
+    label: 'Shared notes',
+    tables: [
+      { name: 'relationship_notes', keys: ['id'], dateColumn: 'created_at', dateType: 'timestamp' },
+    ],
+    files: [],
+  },
+  {
+    id: 'saved',
+    label: 'Saved messages',
+    tables: [
+      { name: 'relationship_saved_messages', keys: ['id'], dateColumn: 'created_at', dateType: 'timestamp' },
+    ],
+    files: [],
+  },
+  {
+    id: 'stickers',
+    label: 'Custom stickers',
+    tables: [
+      { name: 'custom_stickers', keys: ['id'], dateColumn: 'created_at', dateType: 'timestamp' },
+    ],
+    files: [{ table: 'custom_stickers', bucket: PROFILE_BUCKET, columns: ['path'] }],
+  },
 ];
-const EXPORT_BUCKETS=['chat-images','profile-media','relationship-gallery','relationship-voice'];
 
-async function exportTableRows(table,keys){
- const rows=[],pageSize=500;
- for(let offset=0;;offset+=pageSize){
-  let query=sb.from(table).select('*');
-  for(const key of keys)query=query.order(key,{ascending:true});
-  const {data,error}=await query.range(offset,offset+pageSize-1);
-  if(error)throw new Error(`${table}: ${error.message}`);
-  rows.push(...(data||[]));
-  if(!data||data.length<pageSize)break;
- }
- return rows;
+function exportDateBoundary(value, endOfDay) {
+  if (!value) return null;
+  const localDateTime = value + (endOfDay ? 'T23:59:59.999' : 'T00:00:00');
+  const parsed = new Date(localDateTime);
+  if (Number.isNaN(parsed.getTime())) throw new Error('Please choose valid dates.');
+  return parsed.toISOString();
 }
-function setExportStatus(percent,message){
- const bar=$('export-progress'),status=$('export-status');
- if(bar){bar.hidden=false;bar.value=percent===0?0:Math.max(bar.value||0,Math.min(100,percent));}
- if(status)status.textContent=message;
-}
-async function exportStorageBucket(zip,bucket,report){
- const storage=sb.storage.from(bucket),visited=new Set();
- async function walk(prefix='',depth=0){
-  if(depth>12||visited.has(prefix))return;visited.add(prefix);
-  for(let offset=0;;offset+=100){
-   const {data,error}=await storage.list(prefix,{limit:100,offset,sortBy:{column:'name',order:'asc'}});
-   if(error){report.warnings.push(`Storage ${bucket}/${prefix}: ${error.message}`);return;}
-   const entries=data||[];
-   for(const entry of entries){
-    const path=prefix?`${prefix}/${entry.name}`:entry.name;
-    if(entry.id===null&&entry.metadata===null){await walk(path,depth+1);continue;}
-    const {data:blob,error:downloadError}=await storage.download(path);
-    if(downloadError){report.warnings.push(`File ${bucket}/${path}: ${downloadError.message}`);continue;}
-    zip.file(`media/${bucket}/${path}`,blob);report.files+=1;
-    if(report.files%3===0)setExportStatus(55+Math.min(28,report.files),`Adding private media… ${report.files} files`);
-   }
-   if(entries.length<100)break;
+
+async function exportTableRows(table, range) {
+  const rows = [];
+  const pageSize = 500;
+  for (let offset = 0; ; offset += pageSize) {
+    let query = sb.from(table.name).select('*');
+
+    if (table.dateColumn && range.from) {
+      const fromValue = table.dateType === 'date' ? range.from : exportDateBoundary(range.from, false);
+      query = query.gte(table.dateColumn, fromValue);
+    }
+    if (table.dateColumn && range.to) {
+      const toValue = table.dateType === 'date' ? range.to : exportDateBoundary(range.to, true);
+      query = query.lte(table.dateColumn, toValue);
+    }
+
+    for (const key of table.keys) query = query.order(key, { ascending: true });
+    const { data, error } = await query.range(offset, offset + pageSize - 1);
+    if (error) throw new Error(table.name + ': ' + error.message);
+    rows.push(...(data || []));
+    if (!data || data.length < pageSize) break;
   }
- }
- await walk();
+  return rows;
 }
-async function downloadLoversExport(){
- if(state.exporting||!state.user)return;
- state.exporting=true;
- const button=$('export-data-btn');button.disabled=true;button.textContent='Preparing your ZIP…';
- $('export-progress').value=0;
- setExportStatus(2,'Preparing your private export on this device…');
- try{
-  const loaded=await import('https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm');
-  const JSZip=loaded.default||loaded,zip=new JSZip(),db=zip.folder('database');
-  const report={exportedAt:new Date().toISOString(),requestedBy:state.user.id,tables:{},files:0,warnings:[]};
-  const {data:authData,error:authError}=await sb.auth.getUser();
-  if(authError)report.warnings.push(`Account details: ${authError.message}`);
-  zip.folder('account').file('current-user.json',JSON.stringify(authData?.user?{
-   id:authData.user.id,email:authData.user.email||null,created_at:authData.user.created_at||null,last_sign_in_at:authData.user.last_sign_in_at||null
-  }:{id:state.user.id},null,2));
-  for(let i=0;i<EXPORT_TABLES.length;i++){
-   const [table,keys]=EXPORT_TABLES[i];setExportStatus(5+Math.round(i/EXPORT_TABLES.length*45),`Exporting ${table}…`);
-   const rows=await exportTableRows(table,keys);report.tables[table]=rows.length;
-   db.file(`${table}.json`,JSON.stringify(rows,null,2));
+
+function setExportStatus(percent, message) {
+  const bar = $('export-progress');
+  const status = $('export-status');
+  if (bar) {
+    bar.hidden = false;
+    bar.value = Math.max(0, Math.min(100, percent));
   }
-  for(const bucket of EXPORT_BUCKETS){setExportStatus(52,`Reading private storage: ${bucket}…`);await exportStorageBucket(zip,bucket,report);}
-  zip.file('README-EXPORT.txt',[
-   'LOVERS DATA EXPORT',`Exported: ${report.exportedAt}`,`Requested by user ID: ${report.requestedBy}`,'',
-   'DATABASE TABLES',...Object.entries(report.tables).map(([name,count])=>`- ${name}: ${count} records`),'',
-   `PRIVATE MEDIA FILES: ${report.files}`,'',
-   'IMPORTANT','- Personal data export, not a full Supabase project clone.',
-   '- Does not contain passwords, password hashes, API keys or project secrets.',
-   '- Only records allowed by the signed-in account are exported.',
-   '- Any unreadable Storage files are skipped and listed in the manifest.',
-   '- Keep this ZIP private because it contains conversation history and media.','',
-   'WARNINGS',...(report.warnings.length?report.warnings.map(x=>`- ${x}`):['- None reported.'])
-  ].join('\n'));
-  zip.file('export-manifest.json',JSON.stringify(report,null,2));
-  setExportStatus(88,'Compressing your ZIP archive…');
-  const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:3}},meta=>{
-   setExportStatus(88+Math.round(meta.percent*.12),`Building ZIP… ${Math.round(meta.percent)}%`);
+  if (status) status.textContent = message;
+}
+
+function refreshExportSelection() {
+  const choices = [...document.querySelectorAll('input[name="export-category"]')];
+  const selected = choices.filter((choice) => choice.checked).length;
+  const selectAll = $('export-select-all');
+  if (selectAll) {
+    selectAll.checked = selected === choices.length;
+    selectAll.indeterminate = selected > 0 && selected < choices.length;
+  }
+  const count = $('export-selection-count');
+  if (count) count.textContent = selected + ' section' + (selected === 1 ? '' : 's') + ' selected';
+}
+
+function addExportMediaRequest(list, seen, bucket, rawPath) {
+  if (typeof rawPath !== 'string' || !rawPath.trim()) return;
+  const path = rawPath.trim().replace(/^\/+/, '');
+  if (!path || path.split('/').some((part) => part === '..' || part === '.')) return;
+  const key = bucket + '\u0000' + path;
+  if (seen.has(key)) return;
+  seen.add(key);
+  list.push({ bucket, path });
+}
+
+async function exportSavedMessageDetails(savedRows, db, report) {
+  const ids = [...new Set((savedRows || []).map((row) => row.message_id).filter((id) => id !== null && id !== undefined))];
+  const details = [];
+  for (let offset = 0; offset < ids.length; offset += 200) {
+    const batch = ids.slice(offset, offset + 200);
+    const { data, error } = await sb.from('messages').select('*').in('id', batch);
+    if (error) throw new Error('Saved message details: ' + error.message);
+    details.push(...(data || []));
+  }
+  db.file('saved-message-details.json', JSON.stringify(details, null, 2));
+  report.tables['saved-message-details'] = details.length;
+  return details;
+}
+
+async function downloadLoversExport(event) {
+  event?.preventDefault();
+  if (state.exporting || !state.user) return;
+
+  const selectedIds = [...document.querySelectorAll('input[name="export-category"]:checked')].map((box) => box.value);
+  const selected = EXPORT_CATEGORIES.filter((category) => selectedIds.includes(category.id));
+  const from = $('export-from')?.value || '';
+  const to = $('export-to')?.value || '';
+
+  if (!selected.length) {
+    setExportStatus(0, 'Choose at least one section to export.');
+    return;
+  }
+  if (from && to && from > to) {
+    setExportStatus(0, 'The From date must be the same as or earlier than the To date.');
+    return;
+  }
+
+  state.exporting = true;
+  const button = $('export-data-btn');
+  if (button) {
+    button.disabled = true;
+    button.textContent = 'Preparing your ZIP…';
+  }
+  if ($('export-progress')) $('export-progress').value = 0;
+  setExportStatus(1, 'Preparing your private export on this device…');
+
+  try {
+    const loaded = await import('https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm');
+    const JSZip = loaded.default || loaded;
+    const zip = new JSZip();
+    const db = zip.folder('database');
+    const range = { from: from || null, to: to || null };
+    const report = {
+      exportedAt: new Date().toISOString(),
+      requestedBy: state.user.id,
+      categories: selected.map((category) => category.label),
+      dateRange: range,
+      tables: {},
+      files: 0,
+      filesByBucket: {},
+      warnings: [],
+    };
+
+    const { data: authData, error: authError } = await sb.auth.getUser();
+    if (authError) report.warnings.push('Account details: ' + authError.message);
+    if (selectedIds.includes('account')) {
+      const currentUser = authData?.user ? {
+        id: authData.user.id,
+        email: authData.user.email || null,
+        created_at: authData.user.created_at || null,
+        last_sign_in_at: authData.user.last_sign_in_at || null,
+      } : { id: state.user.id };
+      zip.folder('account').file('current-user.json', JSON.stringify(currentUser, null, 2));
+    }
+
+    const rowsByTable = new Map();
+    const tablePlans = selected.flatMap((category) => category.tables);
+    for (let index = 0; index < tablePlans.length; index += 1) {
+      const table = tablePlans[index];
+      const progress = 4 + Math.round(((index + 1) / Math.max(1, tablePlans.length)) * 48);
+      setExportStatus(progress, 'Exporting ' + table.name + '…');
+      const rows = await exportTableRows(table, range);
+      rowsByTable.set(table.name, rows);
+      report.tables[table.name] = rows.length;
+      db.file(table.name + '.json', JSON.stringify(rows, null, 2));
+    }
+
+    let savedMessageDetails = [];
+    if (selectedIds.includes('saved')) {
+      setExportStatus(55, 'Collecting the content of your saved messages…');
+      savedMessageDetails = await exportSavedMessageDetails(
+        rowsByTable.get('relationship_saved_messages') || [], db, report
+      );
+    }
+
+    const mediaRequests = [];
+    const mediaSeen = new Set();
+    for (const category of selected) {
+      for (const fileGroup of category.files) {
+        const rows = rowsByTable.get(fileGroup.table) || [];
+        for (const row of rows) {
+          for (const column of fileGroup.columns) {
+            addExportMediaRequest(mediaRequests, mediaSeen, fileGroup.bucket, row[column]);
+          }
+        }
+      }
+    }
+    // Saved messages remain useful on their own, so include their linked image/audio attachments too.
+    for (const message of savedMessageDetails) {
+      addExportMediaRequest(mediaRequests, mediaSeen, IMAGE_BUCKET, message.image_path);
+    }
+
+    for (let index = 0; index < mediaRequests.length; index += 1) {
+      const item = mediaRequests[index];
+      setExportStatus(
+        58 + Math.round(((index + 1) / Math.max(1, mediaRequests.length)) * 22),
+        'Adding selected files… ' + (index + 1) + ' of ' + mediaRequests.length
+      );
+      const { data: blob, error } = await sb.storage.from(item.bucket).download(item.path);
+      if (error) {
+        report.warnings.push('File ' + item.bucket + '/' + item.path + ': ' + error.message);
+        continue;
+      }
+      zip.file('media/' + item.bucket + '/' + item.path, blob);
+      report.files += 1;
+      report.filesByBucket[item.bucket] = (report.filesByBucket[item.bucket] || 0) + 1;
+    }
+
+    const dateLabel = (range.from || 'Any date') + ' to ' + (range.to || 'Any date');
+    zip.file('README-EXPORT.txt', [
+      'LOVERS DATA EXPORT',
+      'Exported: ' + report.exportedAt,
+      'Requested by user ID: ' + report.requestedBy,
+      'Selected sections: ' + report.categories.join(', '),
+      'Date range: ' + dateLabel,
+      '',
+      'DATABASE TABLES',
+      ...Object.entries(report.tables).map(([name, count]) => '- ' + name + ': ' + count + ' records'),
+      '',
+      'PRIVATE MEDIA FILES: ' + report.files,
+      '',
+      'IMPORTANT',
+      '- This is a personal data export, not a full Supabase project clone.',
+      '- It does not contain passwords, password hashes, API keys or project secrets.',
+      '- Only records allowed by the signed-in account are exported.',
+      '- The date range includes both selected dates; each section uses its own record date.',
+      '- Files linked to selected records are included in the media folder.',
+      '- Current profile information and its linked profile media are included whenever Account & profiles is selected.',
+      '- Any unreadable or missing files are listed in the export manifest.',
+      '- Keep this ZIP private because it may contain conversation history and personal media.',
+      '',
+      'WARNINGS',
+      ...(report.warnings.length ? report.warnings.map((warning) => '- ' + warning) : ['- None reported.']),
+    ].join('\n'));
+    zip.file('export-manifest.json', JSON.stringify(report, null, 2));
+
+    setExportStatus(82, 'Compressing your selected data…');
+    const blob = await zip.generateAsync(
+      { type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 3 } },
+      (meta) => setExportStatus(82 + Math.round(meta.percent * 0.18), 'Building ZIP… ' + Math.round(meta.percent) + '%')
+    );
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'Lovers-Export-' + (range.from || 'all-dates') + '-to-' + (range.to || 'all-dates') +
+      '-' + new Date().toISOString().slice(0, 10) + '.zip';
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+
+    setExportStatus(
+      100,
+      'Ready · ' + Object.values(report.tables).reduce((sum, count) => sum + count, 0) +
+        ' records · ' + report.files + ' files. Check your Downloads folder.'
+    );
+  } catch (error) {
+    setExportStatus(0, 'Export failed: ' + (error.message || 'Unknown error') + '. No data was deleted.');
+  } finally {
+    state.exporting = false;
+    if (button) {
+      button.disabled = false;
+      button.textContent = 'Create ZIP archive';
+    }
+  }
+}
+
+function wireDataExport() {
+  $('export-form')?.addEventListener('submit', downloadLoversExport);
+  $('export-select-all')?.addEventListener('change', (event) => {
+    document.querySelectorAll('input[name="export-category"]').forEach((box) => {
+      box.checked = event.target.checked;
+    });
+    refreshExportSelection();
   });
-  const url=URL.createObjectURL(blob),a=document.createElement('a');
-  a.href=url;a.download=`Lovers-Export-${new Date().toISOString().slice(0,10)}.zip`;
-  document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
-  setExportStatus(100,`Ready · ${report.tables.messages||0} messages · ${report.files} media files. Check your Downloads folder.`);
- }catch(error){
-  setExportStatus(0,`Export failed: ${error.message||'Unknown error'}. No data was deleted.`);
- }finally{
-  state.exporting=false;button.disabled=false;button.textContent='Download everything (.zip)';
- }
+  document.querySelectorAll('input[name="export-category"]').forEach((box) => {
+    box.addEventListener('change', refreshExportSelection);
+  });
+  refreshExportSelection();
 }
-function wireDataExport(){ $('export-data-btn')?.addEventListener('click',downloadLoversExport); }
 
 /* ----------------------------- Startup ----------------------------- */
 function wireAll() {
