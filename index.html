@@ -16,7 +16,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400..700&family=Shrikhand&display=swap">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="features.css">
   <script type="module" src="app.js"></script>
+  <script type="module" src="features.js"></script>
 </head>
 <body>
 
@@ -60,6 +62,16 @@
         <img class="logo" src="logo.svg" alt="">
         <span class="side-title app-name">chat</span>
       </header>
+
+      <nav class="space-nav" aria-label="Your shared space">
+        <p class="space-nav-label">YOUR SPACE</p>
+        <button class="space-nav-button" type="button" data-space="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg> Our corner</button>
+        <button class="space-nav-button" type="button" data-space="calendar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg> Calendar</button>
+        <button class="space-nav-button" type="button" data-space="gallery"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg> Gallery</button>
+        <button class="space-nav-button" type="button" data-space="tasks"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="m8 9 1.5 1.5L12 8M14 9h2M8 16l1.5 1.5L12 15M14 16h2"/></svg> To-do list</button>
+        <p class="space-nav-caption">MESSAGES</p>
+        <button class="space-nav-button active" type="button" data-space="chat" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-1-4.5A7.5 7.5 0 1 1 20 11.5Z"/><path d="M8 11h8M8 14h5"/></svg> Messages</button>
+      </nav>
 
       <ul id="contact-list" class="contacts"></ul>
 
@@ -163,7 +175,189 @@
         </button>
       </form>
     </section>
+
+    <main id="couple-space" class="couple-space" hidden>
+      <header class="space-topbar">
+        <div>
+          <span class="space-kicker">A PRIVATE LITTLE WORLD · JUST THE TWO OF YOU</span>
+          <h1 id="space-page-title" class="space-title">Our little universe</h1>
+          <p id="space-page-subtitle" class="space-subtitle">A small place for the dates, photos, and ordinary moments you want to keep.</p>
+        </div>
+        <div class="space-top-actions">
+          <button id="space-chat-button" class="space-button secondary" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-1-4.5A7.5 7.5 0 1 1 20 11.5Z"/><path d="M8 11h8M8 14h5"/></svg> Open messages</button>
+        </div>
+      </header>
+
+      <div class="space-body">
+        <section id="space-home" class="space-view" hidden>
+          <div class="home-layout">
+            <article class="space-card anniversary-card">
+              <p class="space-eyebrow">THE STORY SO FAR</p>
+              <h2>Every second<br>is part of the story.</h2>
+              <p class="anniversary-date">Counting from 22 November 2026</p>
+              <div class="timer-grid" aria-live="off">
+                <div class="timer-unit"><strong id="timer-years">0</strong><span>Years</span></div>
+                <div class="timer-unit"><strong id="timer-days">0</strong><span>Days</span></div>
+                <div class="timer-unit"><strong id="timer-hours">00</strong><span>Hours</span></div>
+                <div class="timer-unit"><strong id="timer-minutes">00</strong><span>Minutes</span></div>
+                <div class="timer-unit"><strong id="timer-seconds">00</strong><span>Seconds</span></div>
+              </div>
+              <p class="timer-note">A live counter that keeps moving, even when this page is closed.</p>
+            </article>
+
+            <div class="home-side">
+              <article class="space-card">
+                <p class="space-eyebrow">COMING UP</p>
+                <h2>Dates to look forward to</h2>
+                <div id="upcoming-events" class="upcoming-list"></div>
+                <button id="home-add-event" class="space-button ghost" type="button" style="margin-top:18px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> Add a date</button>
+              </article>
+
+              <article class="space-card">
+                <p class="space-eyebrow">LITTLE PLANS</p>
+                <h2><span id="home-task-total">0</span> things on your list</h2>
+                <div class="task-progress">
+                  <div class="task-progress-track"><div id="home-task-fill" class="task-progress-fill"></div></div>
+                  <div class="task-progress-meta"><span id="home-task-done">0 done · 0 left</span><span>together</span></div>
+                </div>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section id="space-calendar" class="space-view" hidden>
+          <div class="calendar-toolbar">
+            <div>
+              <p class="space-eyebrow">YOUR DATES, ALL IN ONE PLACE</p>
+              <h2 id="calendar-month-label" class="calendar-month">November 2026</h2>
+            </div>
+            <div class="space-inline">
+              <button id="calendar-prev" class="space-button ghost" type="button" aria-label="Previous month"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>
+              <button id="calendar-today" class="space-button ghost" type="button">Today</button>
+              <button id="calendar-next" class="space-button ghost" type="button" aria-label="Next month"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>
+              <button id="calendar-add-event" class="space-button" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> Add event</button>
+            </div>
+          </div>
+          <div class="calendar-layout">
+            <div class="space-card calendar-grid-wrap">
+              <div class="calendar-weekdays" aria-hidden="true">
+                <span class="calendar-weekday">Sun</span><span class="calendar-weekday">Mon</span><span class="calendar-weekday">Tue</span><span class="calendar-weekday">Wed</span><span class="calendar-weekday">Thu</span><span class="calendar-weekday">Fri</span><span class="calendar-weekday">Sat</span>
+              </div>
+              <div id="calendar-days" class="calendar-days"></div>
+            </div>
+            <aside class="space-card calendar-selected">
+              <p class="space-eyebrow">ON THIS DATE</p>
+              <h3 id="calendar-selected-date">Selected day</h3>
+              <div id="calendar-event-list" class="calendar-event-list"></div>
+            </aside>
+          </div>
+        </section>
+
+        <section id="space-gallery" class="space-view" hidden>
+          <article class="space-card">
+            <p class="space-eyebrow">PRIVATE PHOTO SHELF</p>
+            <h2>Keep the moments you want to revisit.</h2>
+            <p class="space-muted" style="margin:7px 0 18px;font-size:13px">Photos are stored in a private bucket. Choose the date they belong to, add a caption, and filter them whenever you need.</p>
+            <div class="gallery-upload">
+              <label class="space-field">Photo date
+                <input id="gallery-date" type="date" required>
+              </label>
+              <label class="space-field">Caption
+                <input id="gallery-caption" type="text" maxlength="180" placeholder="A little note for this memory">
+              </label>
+              <div class="space-inline">
+                <input id="gallery-file" type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple hidden>
+                <button id="gallery-select" class="space-button secondary" type="button">Choose photos</button>
+                <button id="gallery-upload" class="space-button" type="button" disabled>Save to gallery</button>
+                <span id="gallery-file-count" class="space-muted" style="font-size:10px">No photos selected</span>
+              </div>
+            </div>
+
+            <div class="gallery-tools">
+              <label class="space-field">Search captions or dates
+                <input id="gallery-search" type="search" placeholder="Search the gallery">
+              </label>
+              <label class="space-field">Year
+                <select id="gallery-year"><option value="">All years</option></select>
+              </label>
+              <label class="space-field">Month
+                <select id="gallery-month">
+                  <option value="">Any month</option>
+                  <option value="01">January</option><option value="02">February</option><option value="03">March</option><option value="04">April</option>
+                  <option value="05">May</option><option value="06">June</option><option value="07">July</option><option value="08">August</option>
+                  <option value="09">September</option><option value="10">October</option><option value="11">November</option><option value="12">December</option>
+                </select>
+              </label>
+              <p id="gallery-count" class="gallery-count">0 photos</p>
+            </div>
+            <div id="gallery-grid" class="gallery-grid"></div>
+          </article>
+        </section>
+
+        <section id="space-tasks" class="space-view" hidden>
+          <article class="space-card">
+            <p class="space-eyebrow">ONE SMALL THING AT A TIME</p>
+            <h2>Things to do together</h2>
+            <p class="space-muted" style="margin:7px 0 0;font-size:13px">Add plans, tick them off, and keep the finished ones as a little record.</p>
+            <div class="task-summary">
+              <span class="task-stat"><strong id="task-count-all">0</strong> total</span>
+              <span class="task-stat"><strong id="task-count-open">0</strong> to do</span>
+              <span class="task-stat"><strong id="task-count-done">0</strong> done</span>
+            </div>
+            <form id="task-form" class="task-add-form">
+              <label class="space-field">Add something to do
+                <input id="task-title" type="text" maxlength="160" placeholder="What should we do?" required>
+              </label>
+              <button class="space-button" type="submit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> Add</button>
+            </form>
+            <p class="task-section-label">UP NEXT</p>
+            <div id="task-list" class="task-list"></div>
+            <p class="task-section-label">DONE AND DUSTED</p>
+            <div id="completed-task-list" class="task-list"></div>
+          </article>
+        </section>
+      </div>
+
+      <nav class="mobile-space-nav" aria-label="Shared space pages">
+        <button type="button" data-space="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span>Home</span></button>
+        <button type="button" data-space="calendar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg><span>Dates</span></button>
+        <button type="button" data-space="gallery"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg><span>Gallery</span></button>
+        <button type="button" data-space="tasks"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="m8 9 1.5 1.5L12 8M14 9h2M8 16l1.5 1.5L12 15M14 16h2"/></svg><span>To-do</span></button>
+        <button type="button" data-space="chat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-1-4.5A7.5 7.5 0 1 1 20 11.5Z"/><path d="M8 11h8M8 14h5"/></svg><span>Chat</span></button>
+      </nav>
+    </main>
   </div>
+
+  <dialog id="event-dialog" class="space-dialog">
+    <form id="event-form">
+      <h2>Add a date to remember</h2>
+      <label class="space-field">Event name
+        <input id="event-title" type="text" maxlength="100" placeholder="Give this day a name" required>
+      </label>
+      <label class="space-field">Date
+        <input id="event-date" type="date" required>
+      </label>
+      <label class="space-field">A note (optional)
+        <textarea id="event-description" maxlength="500" placeholder="Why is this day special?"></textarea>
+      </label>
+      <label class="space-field">Event colour
+        <input id="event-color" type="color" value="#ff168f" style="height:44px;padding:4px">
+      </label>
+      <label class="space-check"><input id="event-repeat" type="checkbox"> Repeat this date every year</label>
+      <div class="space-dialog-actions">
+        <button id="event-close" class="space-button ghost" type="button">Cancel</button>
+        <button class="space-button" type="submit">Save date</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="gallery-lightbox" class="gallery-lightbox">
+    <div style="display:flex;justify-content:flex-end">
+      <button id="gallery-lightbox-close" class="space-button ghost" type="button">Close</button>
+    </div>
+    <img id="gallery-lightbox-image" alt="Saved gallery photo">
+    <p id="gallery-lightbox-caption"></p>
+  </dialog>
 
   <!-- Menu for a message: react, reply, copy, unsend -->
   <div id="msg-menu" class="msg-menu" role="menu" hidden>
