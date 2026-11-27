@@ -99,7 +99,7 @@ const pageCopy = {
   voices: ['Voice library', 'Little voice notes and messages, saved with their dates so you can hear them again.'],
   timeline: ['Our timeline', 'A growing story made from your dates, photographs, and little milestones.'],
   checkin: ['Daily check-in', 'A small daily pause to share how today is going.'],
-  search: ['Search everything', 'Find messages, photo captions, shared notes, dates and plans.'],
+  search: ['Search everything', 'Find messages, photo captions, notes, calendar dates and people.'],
   saved: ['Saved messages', 'Your personal shelf for messages you want to find again.'],
   notes: ['Shared notes', 'A little notebook both of you can read and update.'],
 };
@@ -2042,6 +2042,7 @@ async function downloadLoversExport(){
  if(state.exporting||!state.user)return;
  state.exporting=true;
  const button=$('export-data-btn');button.disabled=true;button.textContent='Preparing your ZIP…';
+ $('export-progress').value=0;
  setExportStatus(2,'Preparing your private export on this device…');
  try{
   const loaded=await import('https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm');
