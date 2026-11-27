@@ -191,6 +191,7 @@ async function initialise(user) {
   setupRealtime();
   startAnniversaryClock();
   $('gallery-date').value = dateISO(new Date());
+  $('voice-date').value = dateISO(new Date());
   $('event-date').value = state.selectedDate;
 }
 
