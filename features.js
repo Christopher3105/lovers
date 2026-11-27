@@ -29,6 +29,9 @@ const state = {
   editingNoteId: null,
   selectedIdeaId: null,
   selectedMood: 'good',
+  selectedEnergy: 3,
+  searchReturnPage: 'home',
+  exporting: false,
   channel: null,
   timer: null,
   refreshTimer: null,
@@ -86,6 +89,7 @@ function setActiveNavigation(page) {
     if (active) button.setAttribute('aria-current', 'page');
     else button.removeAttribute('aria-current');
   });
+  $('mobile-more-toggle')?.classList.toggle('active', ['voices', 'timeline', 'checkin', 'saved', 'notes'].includes(page));
 }
 
 const pageCopy = {
@@ -93,16 +97,23 @@ const pageCopy = {
   calendar: ['Our calendar', 'Birthdays, anniversaries, and the little dates worth remembering.'],
   gallery: ['Our gallery', 'Your shared photo shelf — private, searchable, and saved with its date.'],
   voices: ['Voice library', 'Little voice notes and messages, saved with their dates so you can hear them again.'],
-  tasks: ['Little plans', 'Small things to do together, one check at a time.'],
   timeline: ['Our timeline', 'A growing story made from your dates, photographs, and little milestones.'],
-  jar: ['Date night jar', 'Let the jar choose a simple, fun plan for the two of you.'],
   checkin: ['Daily check-in', 'A small daily pause to share how today is going.'],
   search: ['Search everything', 'Find messages, photo captions, shared notes, dates and plans.'],
   saved: ['Saved messages', 'Your personal shelf for messages you want to find again.'],
   notes: ['Shared notes', 'A little notebook both of you can read and update.'],
 };
 
+function openGlobalSearch() {
+  if (state.page !== 'search') state.searchReturnPage = state.page;
+  showPage('search');
+  $('global-search-input')?.focus();
+}
+
 function showPage(page) {
+  const menu = $('mobile-more-menu');
+  if (menu) menu.hidden = true;
+  $('mobile-more-toggle')?.setAttribute('aria-expanded', 'false');
   if (page === 'chat') {
     state.page = 'chat';
     $('app').classList.remove('space-open');
@@ -128,10 +139,8 @@ function showPage(page) {
   if (page === 'calendar') renderCalendar();
   if (page === 'gallery') loadPhotos();
   if (page === 'voices') loadVoices();
-  if (page === 'tasks') renderTasks();
   if (page === 'home') renderHome();
   if (page === 'timeline') loadTimeline();
-  if (page === 'jar') loadDateIdeas();
   if (page === 'checkin') loadCheckins();
   if (page === 'saved') loadSavedMessages();
   if (page === 'notes') loadNotes();
@@ -141,31 +150,35 @@ function wireNavigation() {
   document.querySelectorAll('[data-space]').forEach((button) => {
     button.addEventListener('click', () => showPage(button.dataset.space));
   });
-  $('space-chat-button')?.addEventListener('click', () => showPage('chat'));
+  $('global-search-open')?.addEventListener('click', openGlobalSearch);
+  $('chat-search-open')?.addEventListener('click', openGlobalSearch);
+  $('global-search-close')?.addEventListener('click', () => showPage(state.searchReturnPage || 'home'));
+  $('mobile-more-toggle')?.addEventListener('click', () => {
+    const menu = $('mobile-more-menu');
+    menu.hidden = !menu.hidden;
+    $('mobile-more-toggle').setAttribute('aria-expanded', String(!menu.hidden));
+  });
+  document.addEventListener('pointerdown', (event) => {
+    const menu = $('mobile-more-menu');
+    const toggle = $('mobile-more-toggle');
+    if (menu && !menu.hidden && !menu.contains(event.target) && !toggle?.contains(event.target)) {
+      menu.hidden = true;
+      toggle?.setAttribute('aria-expanded', 'false');
+    }
+  });
 }
 
 async function loadBaseData() {
-  const [eventsResult, tasksResult, profilesResult] = await Promise.all([
+  const [eventsResult, profilesResult] = await Promise.all([
     sb.from('relationship_events').select('*').order('event_date', { ascending: true }),
-    sb.from('relationship_tasks').select('*').order('done', { ascending: true }).order('created_at', { ascending: false }),
     sb.from('profiles').select('id, display_name, username'),
   ]);
-
   if (eventsResult.error) toast(`Calendar: ${eventsResult.error.message}`);
   else state.events = eventsResult.data || [];
-
-  if (tasksResult.error) toast(`To-do list: ${tasksResult.error.message}`);
-  else state.tasks = tasksResult.data || [];
-
   if (profilesResult.error) toast(`Profiles: ${profilesResult.error.message}`);
-  else state.names = new Map((profilesResult.data || []).map((profile) => [
-    profile.id,
-    profile.display_name || profile.username || 'One of you',
-  ]));
-
+  else state.names = new Map((profilesResult.data || []).map((profile) => [profile.id, profile.display_name || profile.username || 'One of you']));
   renderHome();
   renderCalendar();
-  renderTasks();
 }
 
 function setupRealtime() {
@@ -173,10 +186,8 @@ function setupRealtime() {
   const channel = sb.channel(`relationship-space-${state.user.id}`);
   for (const table of [
     'relationship_events',
-    'relationship_tasks',
     'relationship_photos',
     'relationship_timeline_entries',
-    'relationship_date_ideas',
     'relationship_daily_checkins',
     'relationship_voice_records',
     'relationship_notes',
@@ -188,7 +199,6 @@ function setupRealtime() {
         await loadBaseData();
         if (state.page === 'gallery') await loadPhotos();
         if (state.page === 'timeline') await loadTimeline();
-        if (state.page === 'jar') await loadDateIdeas();
         if (state.page === 'checkin') await loadCheckins();
         if (state.page === 'voices') await loadVoices();
         if (state.page === 'notes') await loadNotes();
@@ -338,12 +348,6 @@ function renderHome() {
     }
   }
 
-  const completed = state.tasks.filter((task) => task.done).length;
-  const total = state.tasks.length;
-  const pending = total - completed;
-  $('home-task-total').textContent = String(total);
-  $('home-task-done').textContent = `${completed} done · ${pending} left`;
-  $('home-task-fill').style.width = total ? `${Math.round(completed / total * 100)}%` : '0%';
 }
 
 function makeEmpty(message) {
@@ -1503,76 +1507,67 @@ async function loadCheckins() {
 
   state.checkins = data || [];
   const own = state.checkins.find((entry) => entry.user_id === state.user.id && entry.checkin_date === today);
-  const noteField = $('checkin-note');
-  const editing = document.activeElement === noteField ||
-    Boolean(document.activeElement?.matches?.('[data-mood]'));
+  const editing = Boolean(document.activeElement?.closest?.('.checkin-hero'));
   if (!editing) {
     state.selectedMood = own?.mood || 'good';
-    noteField.value = own?.note || '';
+    state.selectedEnergy = own?.energy_level || 3;
+    $('checkin-energy').value = String(state.selectedEnergy);
+    $('checkin-highlight').value = own?.highlight || '';
+    $('checkin-note').value = own?.note || '';
   }
+  updateCheckinEnergyLabel();
   $('checkin-date-label').textContent = formatDate(today, { weekday: 'long', day: 'numeric', month: 'long' });
   renderCheckins();
 }
 
+function energyLabel(value) {
+  return ({1:'Very low',2:'Low',3:'Steady',4:'Good',5:'High'})[Number(value)] || 'Steady';
+}
+function updateCheckinEnergyLabel() {
+  const label=$('checkin-energy-label');
+  if(label) label.textContent=energyLabel(state.selectedEnergy);
+}
 function renderCheckins() {
-  const today = dateISO(new Date());
-  const todayRows = state.checkins.filter((entry) => entry.checkin_date === today);
-  const partnerGrid = $('checkin-people');
-  partnerGrid.replaceChildren();
-
-  for (const [userId, name] of state.names.entries()) {
-    const entry = todayRows.find((item) => item.user_id === userId);
-    const card = document.createElement('article');
-    card.className = 'checkin-person-card';
-    const nameNode = document.createElement('strong');
-    nameNode.textContent = userId === state.user.id ? `${name} · You` : name;
-    const moodNode = document.createElement('div');
-    moodNode.className = 'checkin-person-mood';
-
-    if (entry) {
-      const mood = MOODS[entry.mood] || MOODS.okay;
-      moodNode.textContent = `${mood.emoji} ${mood.label}`;
-      const note = document.createElement('p');
-      note.textContent = entry.note || 'No note today — just checking in.';
-      card.append(nameNode, moodNode, note);
-      const updated = document.createElement('small');
-      updated.textContent = `Shared ${new Date(entry.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-      card.append(updated);
-    } else {
-      moodNode.textContent = '🤍 Not checked in yet';
-      const pending = document.createElement('p');
-      pending.textContent = userId === state.user.id ? 'Your check-in is ready when you are.' : 'Their update will appear here.';
-      card.append(nameNode, moodNode, pending);
+  const today=dateISO(new Date());
+  const todayRows=state.checkins.filter(entry=>entry.checkin_date===today);
+  const grid=$('checkin-people'); grid.replaceChildren();
+  for(const [userId,name] of state.names.entries()){
+    const entry=todayRows.find(item=>item.user_id===userId);
+    const card=document.createElement('article'); card.className='checkin-person-card';
+    const head=document.createElement('div'); head.className='checkin-person-head';
+    const who=document.createElement('strong'); who.textContent=userId===state.user.id?`${name} · You`:name;
+    const status=document.createElement('span'); status.className=entry?'checkin-state complete':'checkin-state pending'; status.textContent=entry?'Shared today':'Not yet';
+    head.append(who,status); card.append(head);
+    if(entry){
+      const mood=MOODS[entry.mood]||MOODS.okay;
+      const moodNode=document.createElement('div'); moodNode.className='checkin-person-mood'; moodNode.textContent=`${mood.emoji} ${mood.label}`; card.append(moodNode);
+      if(entry.energy_level){const energy=document.createElement('div');energy.className='checkin-person-details';energy.textContent=`Energy · ${energyLabel(entry.energy_level)}`;card.append(energy);}
+      if(entry.highlight){const highlight=document.createElement('p');highlight.className='checkin-highlight-display';highlight.textContent=`✦ ${entry.highlight}`;card.append(highlight);}
+      if(entry.note){const note=document.createElement('p');note.className='checkin-person-note';note.textContent=entry.note;card.append(note);}
+      const updated=document.createElement('small');updated.textContent=`Updated ${new Date(entry.updated_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`;card.append(updated);
+    }else{
+      const pending=document.createElement('p');pending.className='checkin-person-pending';pending.textContent=userId===state.user.id?'Your check-in is ready whenever you are.':'Their check-in will appear here when they share it.';card.append(pending);
     }
-    partnerGrid.append(card);
+    grid.append(card);
   }
-
-  document.querySelectorAll('[data-mood]').forEach((button) => {
-    const active = button.dataset.mood === state.selectedMood;
-    button.classList.toggle('selected', active);
-    button.setAttribute('aria-pressed', String(active));
+  document.querySelectorAll('[data-mood]').forEach(button=>{
+    const active=button.dataset.mood===state.selectedMood;button.classList.toggle('selected',active);button.setAttribute('aria-pressed',String(active));
   });
-
-  const history = $('checkin-history');
-  history.replaceChildren();
-  const older = state.checkins.filter((entry) => entry.checkin_date !== today);
-  if (!older.length) {
-    history.append(makeEmpty('Your recent check-ins will collect here day by day.'));
-  } else {
-    for (const entry of older) {
-      const row = document.createElement('article');
-      row.className = 'checkin-history-row';
-      const mood = MOODS[entry.mood] || MOODS.okay;
-      const title = document.createElement('strong');
-      title.textContent = `${formatDate(entry.checkin_date, { day: 'numeric', month: 'short' })} · ${state.names.get(entry.user_id) || 'One of you'}`;
-      const detail = document.createElement('span');
-      detail.textContent = `${mood.emoji} ${mood.label}${entry.note ? ` · ${entry.note}` : ''}`;
-      row.append(title, detail);
-      history.append(row);
-    }
+  $('checkin-energy').value=String(state.selectedEnergy);updateCheckinEnergyLabel();
+  const history=$('checkin-history');history.replaceChildren();
+  const older=state.checkins.filter(entry=>entry.checkin_date!==today);
+  if(!older.length){history.append(makeEmpty('Your recent check-ins will collect here day by day.'));}
+  else for(const entry of older){
+    const row=document.createElement('article');row.className='checkin-history-row';
+    const mood=MOODS[entry.mood]||MOODS.okay;
+    const title=document.createElement('strong');title.textContent=`${formatDate(entry.checkin_date,{day:'numeric',month:'short'})} · ${state.names.get(entry.user_id)||'One of you'}`;
+    const detail=document.createElement('span');const parts=[`${mood.emoji} ${mood.label}`];
+    if(entry.energy_level)parts.push(`Energy: ${energyLabel(entry.energy_level)}`);
+    if(entry.highlight)parts.push(`✦ ${entry.highlight}`);
+    if(entry.note)parts.push(entry.note);
+    detail.textContent=parts.join(' · ');row.append(title,detail);history.append(row);
   }
 }
-
 async function saveCheckin() {
   if (!state.user) return;
   const today = dateISO(new Date());
@@ -1580,6 +1575,8 @@ async function saveCheckin() {
     user_id: state.user.id,
     checkin_date: today,
     mood: state.selectedMood,
+    energy_level: state.selectedEnergy,
+    highlight: $('checkin-highlight').value.trim(),
     note: $('checkin-note').value.trim(),
     updated_at: new Date().toISOString(),
   }, { onConflict: 'user_id,checkin_date' }).select().single();
@@ -1600,6 +1597,7 @@ function wireCheckins() {
       renderCheckins();
     });
   });
+  $('checkin-energy').addEventListener('input',()=>{state.selectedEnergy=Number($('checkin-energy').value);updateCheckinEnergyLabel();});
   $('checkin-save').addEventListener('click', saveCheckin);
 }
 
@@ -1889,11 +1887,6 @@ async function runGlobalSearch(event) {
       .select('id,title,description,event_date')
       .ilike('description', pattern).order('event_date', { ascending: false }).limit(8));
   }
-  if (kind === 'all' || kind === 'tasks') {
-    add('task', 'tasks', sb.from('relationship_tasks')
-      .select('id,title,done,created_at')
-      .ilike('title', pattern).order('created_at', { ascending: false }).limit(8));
-  }
 
   await Promise.all(jobs);
   const unique = new Map();
@@ -1924,7 +1917,6 @@ function renderGlobalSearch(term) {
     'note-content': 'SHARED NOTE',
     'date-title': 'CALENDAR DATE',
     'date-description': 'CALENDAR DATE',
-    task: 'TO-DO ITEM',
     profile: 'PERSON',
   };
   const detailFor = (type, row) => {
@@ -1933,7 +1925,7 @@ function renderGlobalSearch(term) {
     if (type === 'profile') return `@${row.username || ''}`;
     if (type.startsWith('note')) return row.content || 'Shared note';
     if (type.startsWith('date')) return row.description || 'Calendar date';
-    return row.done ? `Completed · ${row.title}` : row.title;
+    return row.title;
   };
 
   for (const result of state.searchResults) {
@@ -1959,7 +1951,7 @@ function renderGlobalSearch(term) {
       : type.startsWith('note') ? `Updated ${new Date(row.updated_at).toLocaleDateString()}`
       : type.startsWith('date') ? formatDate(row.event_date)
       : type === 'profile' ? `@${row.username || ''}`
-      : row.done ? 'Completed' : 'To do';
+      : '';
     const meta = document.createElement('small');
     meta.textContent = detailFor(type, row).slice(0, 220);
     copy.append(label, title, detail, meta);
@@ -1998,18 +1990,113 @@ function wireSearch() {
   });
 }
 
+/* ----------------------------- Private data export ----------------------------- */
+const EXPORT_TABLES = [
+ ['profiles',['id']],['relationship_members',['user_id']],['messages',['id']],
+ ['reactions',['message_id','user_id']],['custom_stickers',['id']],['relationship_events',['id']],
+ ['relationship_tasks',['id']],['relationship_photos',['id']],['relationship_timeline_entries',['id']],
+ ['relationship_date_ideas',['id']],['relationship_daily_checkins',['id']],['relationship_voice_records',['id']],
+ ['relationship_notes',['id']],['relationship_saved_messages',['id']],
+];
+const EXPORT_BUCKETS=['chat-images','profile-media','relationship-gallery','relationship-voice'];
+
+async function exportTableRows(table,keys){
+ const rows=[],pageSize=500;
+ for(let offset=0;;offset+=pageSize){
+  let query=sb.from(table).select('*');
+  for(const key of keys)query=query.order(key,{ascending:true});
+  const {data,error}=await query.range(offset,offset+pageSize-1);
+  if(error)throw new Error(`${table}: ${error.message}`);
+  rows.push(...(data||[]));
+  if(!data||data.length<pageSize)break;
+ }
+ return rows;
+}
+function setExportStatus(percent,message){
+ const bar=$('export-progress'),status=$('export-status');
+ if(bar){bar.hidden=false;bar.value=percent===0?0:Math.max(bar.value||0,Math.min(100,percent));}
+ if(status)status.textContent=message;
+}
+async function exportStorageBucket(zip,bucket,report){
+ const storage=sb.storage.from(bucket),visited=new Set();
+ async function walk(prefix='',depth=0){
+  if(depth>12||visited.has(prefix))return;visited.add(prefix);
+  for(let offset=0;;offset+=100){
+   const {data,error}=await storage.list(prefix,{limit:100,offset,sortBy:{column:'name',order:'asc'}});
+   if(error){report.warnings.push(`Storage ${bucket}/${prefix}: ${error.message}`);return;}
+   const entries=data||[];
+   for(const entry of entries){
+    const path=prefix?`${prefix}/${entry.name}`:entry.name;
+    if(entry.id===null&&entry.metadata===null){await walk(path,depth+1);continue;}
+    const {data:blob,error:downloadError}=await storage.download(path);
+    if(downloadError){report.warnings.push(`File ${bucket}/${path}: ${downloadError.message}`);continue;}
+    zip.file(`media/${bucket}/${path}`,blob);report.files+=1;
+    if(report.files%3===0)setExportStatus(55+Math.min(28,report.files),`Adding private media… ${report.files} files`);
+   }
+   if(entries.length<100)break;
+  }
+ }
+ await walk();
+}
+async function downloadLoversExport(){
+ if(state.exporting||!state.user)return;
+ state.exporting=true;
+ const button=$('export-data-btn');button.disabled=true;button.textContent='Preparing your ZIP…';
+ setExportStatus(2,'Preparing your private export on this device…');
+ try{
+  const loaded=await import('https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm');
+  const JSZip=loaded.default||loaded,zip=new JSZip(),db=zip.folder('database');
+  const report={exportedAt:new Date().toISOString(),requestedBy:state.user.id,tables:{},files:0,warnings:[]};
+  const {data:authData,error:authError}=await sb.auth.getUser();
+  if(authError)report.warnings.push(`Account details: ${authError.message}`);
+  zip.folder('account').file('current-user.json',JSON.stringify(authData?.user?{
+   id:authData.user.id,email:authData.user.email||null,created_at:authData.user.created_at||null,last_sign_in_at:authData.user.last_sign_in_at||null
+  }:{id:state.user.id},null,2));
+  for(let i=0;i<EXPORT_TABLES.length;i++){
+   const [table,keys]=EXPORT_TABLES[i];setExportStatus(5+Math.round(i/EXPORT_TABLES.length*45),`Exporting ${table}…`);
+   const rows=await exportTableRows(table,keys);report.tables[table]=rows.length;
+   db.file(`${table}.json`,JSON.stringify(rows,null,2));
+  }
+  for(const bucket of EXPORT_BUCKETS){setExportStatus(52,`Reading private storage: ${bucket}…`);await exportStorageBucket(zip,bucket,report);}
+  zip.file('README-EXPORT.txt',[
+   'LOVERS DATA EXPORT',`Exported: ${report.exportedAt}`,`Requested by user ID: ${report.requestedBy}`,'',
+   'DATABASE TABLES',...Object.entries(report.tables).map(([name,count])=>`- ${name}: ${count} records`),'',
+   `PRIVATE MEDIA FILES: ${report.files}`,'',
+   'IMPORTANT','- Personal data export, not a full Supabase project clone.',
+   '- Does not contain passwords, password hashes, API keys or project secrets.',
+   '- Only records allowed by the signed-in account are exported.',
+   '- Any unreadable Storage files are skipped and listed in the manifest.',
+   '- Keep this ZIP private because it contains conversation history and media.','',
+   'WARNINGS',...(report.warnings.length?report.warnings.map(x=>`- ${x}`):['- None reported.'])
+  ].join('\n'));
+  zip.file('export-manifest.json',JSON.stringify(report,null,2));
+  setExportStatus(88,'Compressing your ZIP archive…');
+  const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:3}},meta=>{
+   setExportStatus(88+Math.round(meta.percent*.12),`Building ZIP… ${Math.round(meta.percent)}%`);
+  });
+  const url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download=`Lovers-Export-${new Date().toISOString().slice(0,10)}.zip`;
+  document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
+  setExportStatus(100,`Ready · ${report.tables.messages||0} messages · ${report.files} media files. Check your Downloads folder.`);
+ }catch(error){
+  setExportStatus(0,`Export failed: ${error.message||'Unknown error'}. No data was deleted.`);
+ }finally{
+  state.exporting=false;button.disabled=false;button.textContent='Download everything (.zip)';
+ }
+}
+function wireDataExport(){ $('export-data-btn')?.addEventListener('click',downloadLoversExport); }
+
 /* ----------------------------- Startup ----------------------------- */
 function wireAll() {
   wireNavigation();
   wireCalendar();
-  wireTasks();
   wireGallery();
   wireVoices();
   wireTimeline();
-  wireDateJar();
   wireCheckins();
   wireNotes();
   wireSearch();
+  wireDataExport();
   window.addEventListener('lovers:show-chat', () => showPage('chat'));
   window.addEventListener('lovers:saved-changed', () => {
     if (state.page === 'saved') loadSavedMessages();

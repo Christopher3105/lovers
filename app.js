@@ -1054,7 +1054,7 @@ async function openConvo(id) {
 function renderHeader() {
   const p = state.contacts.get(state.activeId);
   if (!p) return;
-  el.peerName.textContent = displayName(p);
+  el.peerName.textContent = 'Private chat';
   const key = `${p.id}|${p.avatar_path}|${displayName(p)}`;
   if (el.peerAvatar.dataset.key !== key) {      // only rebuild when the picture changes
     el.peerAvatar.dataset.key = key;

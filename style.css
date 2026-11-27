@@ -138,7 +138,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .app {
   height: 100dvh;
   display: grid;
-  grid-template-columns: 340px minmax(0, 1fr);
+  grid-template-columns: 270px minmax(0, 1fr);
 }
 
 /* ---------- sidebar ---------- */

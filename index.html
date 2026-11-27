@@ -69,14 +69,9 @@
         <button class="space-nav-button" type="button" data-space="calendar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg> Calendar</button>
         <button class="space-nav-button" type="button" data-space="gallery"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg> Gallery</button>
         <button class="space-nav-button" type="button" data-space="voices"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4m-4 0h8"/></svg> Voice library</button>
-        <button class="space-nav-button" type="button" data-space="tasks"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="m8 9 1.5 1.5L12 8M14 9h2M8 16l1.5 1.5L12 15M14 16h2"/></svg> To-do list</button>
         <button class="space-nav-button" type="button" data-space="timeline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10M7 20h10"/><path d="M7 4c0 4 10 4 10 8s-10 4-10 8"/></svg> Our timeline</button>
-        <button class="space-nav-button" type="button" data-space="jar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h8M9 3v3l-4 4v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9l-4-4V3"/><path d="M7 10h10M9 14h.01M15 14h.01"/></svg> Date night jar</button>
         <button class="space-nav-button" type="button" data-space="checkin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 8.7c0 5.2-8.8 11-8.8 11s-8.8-5.8-8.8-11A4.7 4.7 0 0 1 12 6.4a4.7 4.7 0 0 1 8.8 2.3Z"/><path d="M8 12h2l1-2 2 4 1-2h2"/></svg> Daily check-in</button>
-        <p class="space-nav-caption">MESSAGES</p>
-        <button class="space-nav-button active" type="button" data-space="chat" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-1-4.5A7.5 7.5 0 1 1 20 11.5Z"/><path d="M8 11h8M8 14h5"/></svg> Messages</button>
-        <p class="space-nav-caption">TOOLS</p>
-        <button class="space-nav-button" type="button" data-space="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 5 5"/></svg> Search everything</button>
+        <button class="space-nav-button active" type="button" data-space="chat" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-1-4.5A7.5 7.5 0 1 1 20 11.5Z"/><path d="M8 11h8M8 14h5"/></svg> Chat</button>
         <button class="space-nav-button" type="button" data-space="saved"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4.8A1.8 1.8 0 0 1 7.8 3h8.4A1.8 1.8 0 0 1 18 4.8V21l-6-4-6 4z"/></svg> Saved messages</button>
         <button class="space-nav-button" type="button" data-space="notes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg> Shared notes</button>
 
@@ -118,6 +113,7 @@
             <span id="peer-status" class="peer-status"></span>
           </span>
         </button>
+        <button id="chat-search-open" class="icon-btn chat-search-open" type="button" aria-label="Search everything" title="Search everything"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 5 5"/></svg></button>
       </header>
 
       <div id="pinned-banner" class="pinned-banner" hidden>
@@ -201,7 +197,7 @@
           <p id="space-page-subtitle" class="space-subtitle">A small place for the dates, photos, and ordinary moments you want to keep.</p>
         </div>
         <div class="space-top-actions">
-          <button id="space-chat-button" class="space-button secondary" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-1-4.5A7.5 7.5 0 1 1 20 11.5Z"/><path d="M8 11h8M8 14h5"/></svg> Open messages</button>
+          <button id="global-search-open" class="top-search-button" type="button" aria-label="Search everything" title="Search everything"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 5 5"/></svg></button>
         </div>
       </header>
 
@@ -230,14 +226,7 @@
                 <button id="home-add-event" class="space-button ghost" type="button" style="margin-top:18px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> Add a date</button>
               </article>
 
-              <article class="space-card">
-                <p class="space-eyebrow">LITTLE PLANS</p>
-                <h2><span id="home-task-total">0</span> things on your list</h2>
-                <div class="task-progress">
-                  <div class="task-progress-track"><div id="home-task-fill" class="task-progress-fill"></div></div>
-                  <div class="task-progress-meta"><span id="home-task-done">0 done · 0 left</span><span>together</span></div>
-                </div>
-              </article>
+              
             </div>
           </div>
         </section>
@@ -352,29 +341,6 @@
           </article>
         </section>
 
-        <section id="space-tasks" class="space-view" hidden>
-          <article class="space-card">
-            <p class="space-eyebrow">ONE SMALL THING AT A TIME</p>
-            <h2>Things to do together</h2>
-            <p class="space-muted" style="margin:7px 0 0;font-size:13px">Add plans, tick them off, and keep the finished ones as a little record.</p>
-            <div class="task-summary">
-              <span class="task-stat"><strong id="task-count-all">0</strong> total</span>
-              <span class="task-stat"><strong id="task-count-open">0</strong> to do</span>
-              <span class="task-stat"><strong id="task-count-done">0</strong> done</span>
-            </div>
-            <form id="task-form" class="task-add-form">
-              <label class="space-field">Add something to do
-                <input id="task-title" type="text" maxlength="160" placeholder="What should we do?" required>
-              </label>
-              <button class="space-button" type="submit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> Add</button>
-            </form>
-            <p class="task-section-label">UP NEXT</p>
-            <div id="task-list" class="task-list"></div>
-            <p class="task-section-label">DONE AND DUSTED</p>
-            <div id="completed-task-list" class="task-list"></div>
-          </article>
-        </section>
-
         <section id="space-timeline" class="space-view" hidden>
           <article class="space-card timeline-intro">
             <div>
@@ -401,60 +367,6 @@
           <div id="timeline-feed" class="timeline-feed"></div>
         </section>
 
-        <section id="space-jar" class="space-view" hidden>
-          <div class="date-jar-layout">
-            <article class="space-card date-jar-hero">
-              <p class="space-eyebrow">WHEN YOU CAN'T PICK A PLAN</p>
-              <h2>Let the jar decide.</h2>
-              <p>Little ideas for a good afternoon, a quiet evening, or a day you want to make different.</p>
-              <div id="date-picked" class="date-picked">
-                <span class="date-picked-label">THE JAR IS READY</span>
-                <h2>Your next little plan is waiting.</h2>
-                <p>Add ideas to your jar, then let it surprise you.</p>
-              </div>
-              <button id="date-pick" class="space-button date-pick-button" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4"/></svg> Pick for us</button>
-              <p class="date-jar-note">The jar gives every idea a turn before repeating one.</p>
-            </article>
-
-            <article class="space-card">
-              <p class="space-eyebrow">ADD YOUR OWN IDEAS</p>
-              <h2>Fill the jar</h2>
-              <p class="space-muted" style="margin:7px 0 16px;font-size:13px">Both of you can add ideas. They appear in the same shared jar.</p>
-              <form id="date-idea-form" class="date-idea-form">
-                <label class="space-field">Idea
-                  <input id="date-idea-title" type="text" maxlength="120" placeholder="Something fun to do..." required>
-                </label>
-                <label class="space-field">Category
-                  <select id="date-idea-category">
-                    <option>At home</option>
-                    <option>Outdoors</option>
-                    <option>Creative</option>
-                    <option>Food</option>
-                    <option>Games</option>
-                    <option>Planning</option>
-                    <option>Anything</option>
-                  </select>
-                </label>
-                <label class="space-field">A little detail (optional)
-                  <textarea id="date-idea-description" maxlength="300" rows="2" placeholder="Add a note or a twist..."></textarea>
-                </label>
-                <button class="space-button" type="submit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> Add idea</button>
-              </form>
-            </article>
-          </div>
-
-          <article class="space-card date-idea-list-card">
-            <div class="date-idea-list-head">
-              <div>
-                <p class="space-eyebrow">THE SHARED COLLECTION</p>
-                <h2>Inside the jar</h2>
-              </div>
-              <span id="date-idea-count" class="task-stat">0 ideas</span>
-            </div>
-            <div id="date-idea-list" class="date-idea-list"></div>
-          </article>
-        </section>
-
         <section id="space-checkin" class="space-view" hidden>
           <article class="space-card checkin-hero">
             <p class="space-eyebrow">A LITTLE PAUSE IN THE DAY</p>
@@ -467,9 +379,9 @@
               <button class="mood-choice" type="button" data-mood="tired" aria-pressed="false"><span>😴</span><small>Tired</small></button>
               <button class="mood-choice" type="button" data-mood="quiet" aria-pressed="false"><span>🤍</span><small>Quiet day</small></button>
             </div>
-            <label class="space-field checkin-note-field">A few words (optional)
-              <textarea id="checkin-note" maxlength="240" rows="3" placeholder="Anything you'd like to share about today..."></textarea>
-            </label>
+            <div class="checkin-energy-control"><div class="checkin-control-heading"><strong>How was your energy?</strong><span id="checkin-energy-label">Steady</span></div><input id="checkin-energy" type="range" min="1" max="5" step="1" value="3" aria-label="Energy level from low to high"><div class="checkin-energy-labels"><span>Running low</span><span>Full of energy</span></div></div>
+            <label class="space-field checkin-highlight-field">One little highlight (optional)<input id="checkin-highlight" type="text" maxlength="180" placeholder="Something that made today a little better..."></label>
+            <label class="space-field checkin-note-field">Anything on your mind? (optional)<textarea id="checkin-note" maxlength="240" rows="3" placeholder="A thought, a challenge, or just a few words..."></textarea></label>
             <div class="space-inline">
               <button id="checkin-save" class="space-button" type="button">Save today's check-in</button>
               <span class="space-muted" style="font-size:11px">You can update it later today.</span>
@@ -505,7 +417,6 @@
                   <option value="photos">Photo captions</option>
                   <option value="notes">Shared notes</option>
                   <option value="dates">Calendar dates</option>
-                  <option value="tasks">To-do items</option>
                   <option value="people">People</option>
                 </select>
               </label>
@@ -514,7 +425,7 @@
           </article>
           <div class="tool-results-head">
             <span id="global-search-count" class="gallery-count">Search results will appear here.</span>
-            <button id="global-search-clear" class="space-button ghost" type="button">Clear</button>
+            <div class="space-inline"><button id="global-search-clear" class="space-button ghost" type="button">Clear</button><button id="global-search-close" class="space-button ghost" type="button">Close</button></div>
           </div>
           <div id="global-search-results" class="tool-results"></div>
         </section>
@@ -542,21 +453,20 @@
         </section>
       </div>
 
-      <nav class="mobile-space-nav" aria-label="Shared space pages">
-        <button type="button" data-space="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span>Home</span></button>
-        <button type="button" data-space="calendar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg><span>Dates</span></button>
-        <button type="button" data-space="gallery"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg><span>Gallery</span></button>
-        <button type="button" data-space="voices"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4m-4 0h8"/></svg><span>Voices</span></button>
-        <button type="button" data-space="tasks"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="m8 9 1.5 1.5L12 8M14 9h2M8 16l1.5 1.5L12 15M14 16h2"/></svg><span>To-do</span></button>
-        <button type="button" data-space="timeline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10M7 20h10"/><path d="M7 4c0 4 10 4 10 8s-10 4-10 8"/></svg><span>Story</span></button>
-        <button type="button" data-space="jar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h8M9 3v3l-4 4v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9l-4-4V3"/><path d="M7 10h10M9 14h.01M15 14h.01"/></svg><span>Jar</span></button>
-        <button type="button" data-space="checkin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 8.7c0 5.2-8.8 11-8.8 11s-8.8-5.8-8.8-11A4.7 4.7 0 0 1 12 6.4a4.7 4.7 0 0 1 8.8 2.3Z"/><path d="M8 12h2l1-2 2 4 1-2h2"/></svg><span>Check-in</span></button>
-        <button type="button" data-space="chat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-1-4.5A7.5 7.5 0 1 1 20 11.5Z"/><path d="M8 11h8M8 14h5"/></svg><span>Chat</span></button>
-        <button type="button" data-space="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 5 5"/></svg><span>Search</span></button>
-        <button type="button" data-space="saved"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4.8A1.8 1.8 0 0 1 7.8 3h8.4A1.8 1.8 0 0 1 18 4.8V21l-6-4-6 4z"/></svg><span>Saved</span></button>
-        <button type="button" data-space="notes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg><span>Notes</span></button>
-
-      </nav>
+      <div id="mobile-more-menu" class="mobile-more-menu" hidden>
+  <button type="button" data-space="voices"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="9" y="2" width="6" height="13" rx="3"/><path d="M5 11v1a7 7 0 0 0 14 0v-1M12 19v3m-4 0h8"/></svg> Voice library</button>
+  <button type="button" data-space="timeline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M7 4h10M7 20h10M7 4c0 4 10 4 10 8s-10 4-10 8"/></svg> Our timeline</button>
+  <button type="button" data-space="checkin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M20 8c0 6-8 12-8 12S4 14 4 8a4 4 0 0 1 8-1 4 4 0 0 1 8 1Z"/></svg> Daily check-in</button>
+  <button type="button" data-space="saved"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 4h12v17l-6-4-6 4z"/></svg> Saved messages</button>
+  <button type="button" data-space="notes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M7 3h7l5 5v13H7zM14 3v5h5M9 13h6M9 17h6"/></svg> Shared notes</button>
+</div>
+<nav class="mobile-space-nav" aria-label="Shared space pages">
+  <button type="button" data-space="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span>Home</span></button>
+  <button type="button" data-space="calendar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg><span>Dates</span></button>
+  <button type="button" data-space="gallery"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg><span>Gallery</span></button>
+  <button type="button" data-space="chat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-1-4.5A7.5 7.5 0 1 1 20 11.5Z"/><path d="M8 11h8M8 14h5"/></svg><span>Chat</span></button>
+  <button id="mobile-more-toggle" type="button" aria-expanded="false" aria-controls="mobile-more-menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg><span>More</span></button>
+</nav>
     </main>
   </div>
 
@@ -755,6 +665,7 @@
         <span>Show a notification for new messages when this tab is in the background</span>
       </label>
 
+      <section class="export-panel" aria-labelledby="export-title"><p class="space-eyebrow">YOUR DATA</p><h3 id="export-title">Keep a copy of Lovers.</h3><p>Download messages, profiles, calendar, notes and private media as one ZIP file. It is created on this device.</p><button id="export-data-btn" class="space-button secondary" type="button">Download everything (.zip)</button><progress id="export-progress" max="100" value="0" hidden></progress><p id="export-status" class="export-status" role="status" aria-live="polite"></p></section>
       <p id="set-msg" class="form-error" role="alert"></p>
 
       <div class="sheet-actions">

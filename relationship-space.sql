@@ -368,6 +368,8 @@ create table if not exists public.relationship_daily_checkins (
   checkin_date date not null default current_date,
   mood text not null check (mood in ('great','good','okay','tired','quiet')),
   note text not null default '' check (char_length(note) <= 240),
+  energy_level smallint check (energy_level is null or energy_level between 1 and 5),
+  highlight text not null default '' check (char_length(highlight) <= 180),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (user_id, checkin_date)
