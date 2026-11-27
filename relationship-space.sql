@@ -67,6 +67,13 @@ create index if not exists relationship_photos_date_idx
 create index if not exists relationship_photos_uploaded_by_idx
   on public.relationship_photos (uploaded_by);
 
+alter table public.relationship_photos
+  add column if not exists source_message_id bigint
+  references public.messages(id) on delete set null;
+create unique index if not exists relationship_photos_source_message_uidx
+  on public.relationship_photos(source_message_id)
+  where source_message_id is not null;
+
 alter table public.relationship_events enable row level security;
 alter table public.relationship_tasks enable row level security;
 alter table public.relationship_photos enable row level security;
@@ -185,6 +192,7 @@ create table if not exists public.relationship_timeline_entries (
 grant select, insert, update, delete on public.relationship_events to authenticated;
 grant select, insert, update, delete on public.relationship_tasks to authenticated;
 grant select, insert, delete on public.relationship_photos to authenticated;
+grant select, insert, delete on public.relationship_voice_records to authenticated;
 grant select, insert, delete on public.relationship_timeline_entries to authenticated;
 grant select, insert, delete on public.relationship_date_ideas to authenticated;
 grant update (last_picked_at) on public.relationship_date_ideas to authenticated;
@@ -241,7 +249,50 @@ create policy "Users delete their own gallery objects"
     and owner_id = (select auth.uid())::text
   );
 
-do $$
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'relationship-voice',
+  'relationship-voice',
+  false,
+  20971520,
+  array[
+    'audio/webm','audio/ogg','audio/mp4','audio/mpeg','audio/aac',
+    'audio/x-m4a','audio/wav','audio/x-wav','audio/flac'
+  ]::text[]
+)
+on conflict (id) do update
+set public = false,
+    file_size_limit = excluded.file_size_limit,
+    allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists "Relationship members can read voice files" on storage.objects;
+create policy "Relationship members can read voice files"
+  on storage.objects for select to authenticated
+  using (
+    bucket_id = 'relationship-voice'
+    and exists (select 1 from public.relationship_members m where m.user_id = (select auth.uid()))
+  );
+
+drop policy if exists "Relationship members can upload their voice files" on storage.objects;
+create policy "Relationship members can upload their voice files"
+  on storage.objects for insert to authenticated
+  with check (
+    bucket_id = 'relationship-voice'
+    and (storage.foldername(name))[1] = (select auth.uid())::text
+    and exists (select 1 from public.relationship_members m where m.user_id = (select auth.uid()))
+  );
+
+drop policy if exists "Members can delete their own voice files" on storage.objects;
+create policy "Members can delete their own voice files"
+  on storage.objects for delete to authenticated
+  using (
+    bucket_id = 'relationship-voice'
+    and owner_id = (select auth.uid())::text
+    and exists (select 1 from public.relationship_members m where m.user_id = (select auth.uid()))
+  );
+
+do $
 declare
   tbl text;
 begin
@@ -251,7 +302,8 @@ begin
     'relationship_photos',
     'relationship_timeline_entries',
     'relationship_date_ideas',
-    'relationship_daily_checkins'
+    'relationship_daily_checkins',
+    'relationship_voice_records'
   ]
   loop
     if not exists (
@@ -345,12 +397,13 @@ create policy "Relationship members can mark date ideas picked"
   with check (exists (select 1 from public.relationship_members m where m.user_id = (select auth.uid())));
 
 drop policy if exists "Members can delete their own date ideas" on public.relationship_date_ideas;
-create policy "Members can delete their own date ideas"
+drop policy if exists "Members can remove shared date ideas" on public.relationship_date_ideas;
+create policy "Members can remove shared date ideas"
   on public.relationship_date_ideas for delete to authenticated
-  using (
-    created_by = (select auth.uid())
-    and exists (select 1 from public.relationship_members m where m.user_id = (select auth.uid()))
-  );
+  using (exists (
+    select 1 from public.relationship_members m
+    where m.user_id = (select auth.uid())
+  ));
 
 drop policy if exists "Relationship members can read daily check-ins" on public.relationship_daily_checkins;
 create policy "Relationship members can read daily check-ins"
@@ -403,6 +456,47 @@ values
   ('Blind snack tasting', 'Choose a few familiar snacks and guess each one with your eyes open.', 'Food'),
   ('Memory-lane evening', 'Look through your gallery and choose a favourite memory each.', 'At home')
 on conflict (title) do nothing;
+
+
+-- Private voice-message library and source-message links for saved chat media.
+create table if not exists public.relationship_voice_records (
+  id uuid primary key default gen_random_uuid(),
+  storage_path text not null unique,
+  title text not null check (char_length(btrim(title)) between 1 and 120),
+  voice_date date not null default current_date,
+  duration_seconds integer not null default 0 check (duration_seconds >= 0),
+  uploaded_by uuid not null default auth.uid()
+    references public.profiles(id) on delete cascade,
+  source_message_id bigint unique
+    references public.messages(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index if not exists relationship_voice_date_idx
+  on public.relationship_voice_records(voice_date desc, created_at desc);
+create index if not exists relationship_voice_uploader_idx
+  on public.relationship_voice_records(uploaded_by);
+alter table public.relationship_voice_records enable row level security;
+
+drop policy if exists "Relationship members can read voice library" on public.relationship_voice_records;
+create policy "Relationship members can read voice library"
+  on public.relationship_voice_records for select to authenticated
+  using (exists (select 1 from public.relationship_members m where m.user_id = (select auth.uid())));
+
+drop policy if exists "Members can add their own voice records" on public.relationship_voice_records;
+create policy "Members can add their own voice records"
+  on public.relationship_voice_records for insert to authenticated
+  with check (
+    uploaded_by = (select auth.uid())
+    and exists (select 1 from public.relationship_members m where m.user_id = (select auth.uid()))
+  );
+
+drop policy if exists "Members can delete their own voice records" on public.relationship_voice_records;
+create policy "Members can delete their own voice records"
+  on public.relationship_voice_records for delete to authenticated
+  using (
+    uploaded_by = (select auth.uid())
+    and exists (select 1 from public.relationship_members m where m.user_id = (select auth.uid()))
+  );
 
 grant usage on schema public to authenticated;
 grant select, insert, update, delete on public.relationship_events to authenticated;
