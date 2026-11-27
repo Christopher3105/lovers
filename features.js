@@ -1333,15 +1333,14 @@ function renderDateIdeas() {
     copy.append(title, detail);
     row.append(copy);
 
-    if (idea.created_by === state.user.id) {
-      const remove = document.createElement('button');
-      remove.type = 'button';
-      remove.className = 'date-idea-remove';
-      remove.setAttribute('aria-label', `Remove ${idea.title}`);
-      remove.innerHTML = icons.trash;
-      remove.addEventListener('click', () => deleteDateIdea(idea.id));
-      row.append(remove);
-    }
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'date-idea-remove';
+    remove.setAttribute('aria-label', `Remove ${idea.title} from the shared jar`);
+    remove.title = 'Remove from the shared jar';
+    remove.innerHTML = icons.trash;
+    remove.addEventListener('click', () => deleteDateIdea(idea.id));
+    row.append(remove);
     list.append(row);
   }
 
