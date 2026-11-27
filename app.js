@@ -91,6 +91,8 @@ const state = {
   messagePoll: null,
   pollingMessages: false,
   seenIncoming: new Set(),
+  seenOutgoing: new Set(),
+  lastOutgoingMessageId: 0,
   lastTypingSent: 0,
   stickToBottom: true,
   lastSync: 0,
@@ -223,7 +225,8 @@ function teardown() {
   clearInterval(state.messagePoll);
   Object.assign(state, {
     me: null, activeId: null, room: null, inbox: null, heartbeat: null, messagePoll: null,
-    pollingMessages: false, seenIncoming: new Set(), replyTo: null, menuMsg: null,
+    pollingMessages: false, seenIncoming: new Set(), seenOutgoing: new Set(),
+    lastOutgoingMessageId: 0, replyTo: null, menuMsg: null,
     contacts: new Map(), convos: new Map(), unread: new Map(), previews: new Map(),
     online: new Set(), typing: new Map(), reactions: new Map(), quoteCache: new Map(),
     customStickers: [], stickerEdit: false,
@@ -342,32 +345,47 @@ async function pollIncomingMessages() {
   if (!state.me || document.visibilityState !== 'visible' || state.pollingMessages) return;
   state.pollingMessages = true;
   try {
-    const { data, error } = await sb.from('messages')
-      .select('*')
-      .eq('receiver_id', state.me.id)
-      .is('read_at', null)
-      .is('deleted_at', null)
-      .order('id', { ascending: true })
-      .limit(100);
+    const [incomingResult, outgoingResult] = await Promise.all([
+      sb.from('messages')
+        .select('*')
+        .eq('receiver_id', state.me.id)
+        .is('read_at', null)
+        .is('deleted_at', null)
+        .order('id', { ascending: true })
+        .limit(100),
+      sb.from('messages')
+        .select('*')
+        .eq('sender_id', state.me.id)
+        .gt('id', state.lastOutgoingMessageId)
+        .is('deleted_at', null)
+        .order('id', { ascending: true })
+        .limit(100),
+    ]);
 
-    if (error) {
-      console.warn('Unread-message sync:', error.message);
-      return;
+    if (incomingResult.error) {
+      console.warn('Unread-message sync:', incomingResult.error.message);
+    } else {
+      const unread = new Map();
+      for (const message of incomingResult.data || []) {
+        unread.set(message.sender_id, (unread.get(message.sender_id) || 0) + 1);
+        if (!state.seenIncoming.has(message.id)) onIncoming(message);
+      }
+      // The server's unread set is authoritative. Realtime and polling share
+      // the same message-id guard so the same message is never counted twice.
+      state.unread = unread;
+      renderContacts();
+      updateTitle();
     }
 
-    const unread = new Map();
-    for (const message of data || []) {
-      unread.set(message.sender_id, (unread.get(message.sender_id) || 0) + 1);
-      if (!state.seenIncoming.has(message.id)) onIncoming(message);
+    if (outgoingResult.error) {
+      console.warn('Sent-message device sync:', outgoingResult.error.message);
+    } else {
+      for (const message of outgoingResult.data || []) {
+        onSentFromOtherDevice(message);
+      }
     }
-
-    // Use the server's unread set as the source of truth, avoiding duplicate
-    // badges when both Realtime and the fallback observe the same message.
-    state.unread = unread;
-    renderContacts();
-    updateTitle();
   } catch (error) {
-    console.warn('Unread-message sync failed:', error);
+    console.warn('Message sync failed:', error);
   } finally {
     state.pollingMessages = false;
   }
@@ -375,6 +393,14 @@ async function pollIncomingMessages() {
 
 function startMessagePolling() {
   clearInterval(state.messagePoll);
+  // loadPreviews() ran before boot() starts the poller; use their latest
+  // outgoing row as the cursor so we only look for messages sent afterwards.
+  state.lastOutgoingMessageId = Math.max(
+    0,
+    ...[...state.previews.values()]
+      .filter((message) => message.sender_id === state.me?.id)
+      .map((message) => Number(message.id) || 0)
+  );
   pollIncomingMessages();
   state.messagePoll = setInterval(pollIncomingMessages, 3000);
 }
@@ -385,10 +411,14 @@ function subscribe() {
   const inbox = sb.channel(`inbox-${me}`);
 
   inbox
-    // new messages to me
+    // new messages addressed to this account
     .on('postgres_changes',
       { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${me}` },
       (p) => onIncoming(p.new))
+    // messages sent by this account on another device (same login, other session)
+    .on('postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'messages', filter: `sender_id=eq.${me}` },
+      (p) => onSentFromOtherDevice(p.new))
     // my messages being read
     .on('postgres_changes',
       { event: 'UPDATE', schema: 'public', table: 'messages', filter: `sender_id=eq.${me}` },
@@ -434,6 +464,32 @@ function subscribe() {
       if (status === 'SUBSCRIBED') await room.track({ since: new Date().toISOString() });
     });
   state.room = room;
+}
+
+function onSentFromOtherDevice(m) {
+  if (!m || m.sender_id !== state.me?.id) return;
+  if (state.seenOutgoing.has(m.id)) return;
+  state.seenOutgoing.add(m.id);
+  if (state.seenOutgoing.size > 600) {
+    const first = state.seenOutgoing.values().next().value;
+    state.seenOutgoing.delete(first);
+  }
+  state.lastOutgoingMessageId = Math.max(state.lastOutgoingMessageId, Number(m.id) || 0);
+
+  const other = m.receiver_id;
+  if (!state.contacts.has(other)) loadContacts().then(renderContacts);
+  setPreview(other, m);
+
+  const c = convo(other);
+  if (c.loaded) upsert(c, m);
+  if (state.activeId === other && c.loaded) {
+    const wasBottom = nearBottom();
+    renderMessages();
+    if (wasBottom) scrollToBottom(true);
+    else el.jump.hidden = false;
+  }
+  renderContacts();
+  renderHeader();
 }
 
 function onIncoming(m) {
