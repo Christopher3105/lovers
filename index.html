@@ -75,6 +75,11 @@
         <button class="space-nav-button" type="button" data-space="checkin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 8.7c0 5.2-8.8 11-8.8 11s-8.8-5.8-8.8-11A4.7 4.7 0 0 1 12 6.4a4.7 4.7 0 0 1 8.8 2.3Z"/><path d="M8 12h2l1-2 2 4 1-2h2"/></svg> Daily check-in</button>
         <p class="space-nav-caption">MESSAGES</p>
         <button class="space-nav-button active" type="button" data-space="chat" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-1-4.5A7.5 7.5 0 1 1 20 11.5Z"/><path d="M8 11h8M8 14h5"/></svg> Messages</button>
+        <p class="space-nav-caption">TOOLS</p>
+        <button class="space-nav-button" type="button" data-space="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 5 5"/></svg> Search everything</button>
+        <button class="space-nav-button" type="button" data-space="saved"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4.8A1.8 1.8 0 0 1 7.8 3h8.4A1.8 1.8 0 0 1 18 4.8V21l-6-4-6 4z"/></svg> Saved messages</button>
+        <button class="space-nav-button" type="button" data-space="notes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg> Shared notes</button>
+
       </nav>
 
       <ul id="contact-list" class="contacts"></ul>
@@ -475,6 +480,57 @@
             <div id="checkin-history" class="checkin-history"></div>
           </article>
         </section>
+
+        <section id="space-search" class="space-view" hidden>
+          <article class="space-card tool-search-card">
+            <p class="space-eyebrow">FIND SOMETHING AGAIN</p>
+            <h2>Search your little world.</h2>
+            <p class="space-muted" style="margin:7px 0 18px;font-size:13px">Look through messages, photo captions, shared notes, dates and tasks.</p>
+            <form id="global-search-form" class="global-search-form">
+              <label class="space-field search-query-field">Search
+                <input id="global-search-input" type="search" maxlength="100" placeholder="Try a word, name, place or memory..." autocomplete="off">
+              </label>
+              <label class="space-field">In
+                <select id="global-search-kind">
+                  <option value="all">Everything</option>
+                  <option value="messages">Messages</option>
+                  <option value="photos">Photo captions</option>
+                  <option value="notes">Shared notes</option>
+                  <option value="dates">Calendar dates</option>
+                  <option value="tasks">To-do items</option>
+                </select>
+              </label>
+              <button class="space-button" type="submit">Search</button>
+            </form>
+          </article>
+          <div class="tool-results-head">
+            <span id="global-search-count" class="gallery-count">Search results will appear here.</span>
+            <button id="global-search-clear" class="space-button ghost" type="button">Clear</button>
+          </div>
+          <div id="global-search-results" class="tool-results"></div>
+        </section>
+
+        <section id="space-saved" class="space-view" hidden>
+          <article class="space-card">
+            <p class="space-eyebrow">KEEP THE IMPORTANT BITS</p>
+            <h2>Your saved messages.</h2>
+            <p class="space-muted" style="margin:7px 0 16px;font-size:13px">Only you can see your saved list. Pin the messages you want to keep at the top.</p>
+            <div id="saved-message-count" class="gallery-count">Loading saved messages…</div>
+          </article>
+          <div id="saved-message-list" class="saved-message-list"></div>
+        </section>
+
+        <section id="space-notes" class="space-view" hidden>
+          <article class="space-card notes-intro">
+            <div>
+              <p class="space-eyebrow">A SHARED LITTLE NOTEBOOK</p>
+              <h2>Things worth writing down.</h2>
+              <p class="space-muted" style="margin:7px 0 0;font-size:13px">Plans, ideas, lists, links and reminders. Both of you can add and edit these notes.</p>
+            </div>
+            <button id="note-add" class="space-button" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> New note</button>
+          </article>
+          <div id="notes-list" class="notes-grid"></div>
+        </section>
       </div>
 
       <nav class="mobile-space-nav" aria-label="Shared space pages">
@@ -487,6 +543,10 @@
         <button type="button" data-space="jar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h8M9 3v3l-4 4v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9l-4-4V3"/><path d="M7 10h10M9 14h.01M15 14h.01"/></svg><span>Jar</span></button>
         <button type="button" data-space="checkin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 8.7c0 5.2-8.8 11-8.8 11s-8.8-5.8-8.8-11A4.7 4.7 0 0 1 12 6.4a4.7 4.7 0 0 1 8.8 2.3Z"/><path d="M8 12h2l1-2 2 4 1-2h2"/></svg><span>Check-in</span></button>
         <button type="button" data-space="chat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-1-4.5A7.5 7.5 0 1 1 20 11.5Z"/><path d="M8 11h8M8 14h5"/></svg><span>Chat</span></button>
+        <button type="button" data-space="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 5 5"/></svg><span>Search</span></button>
+        <button type="button" data-space="saved"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4.8A1.8 1.8 0 0 1 7.8 3h8.4A1.8 1.8 0 0 1 18 4.8V21l-6-4-6 4z"/></svg><span>Saved</span></button>
+        <button type="button" data-space="notes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg><span>Notes</span></button>
+
       </nav>
     </main>
   </div>
@@ -550,6 +610,23 @@
     </form>
   </dialog>
 
+
+  <dialog id="note-dialog" class="space-dialog">
+    <form id="note-form">
+      <h2 id="note-dialog-title">New shared note</h2>
+      <label class="space-field">Title
+        <input id="note-title" type="text" maxlength="120" placeholder="Give this note a name" required>
+      </label>
+      <label class="space-field">Note
+        <textarea id="note-content" maxlength="12000" rows="8" placeholder="Write your plans, ideas, lists or anything you want to keep..." style="min-height:180px"></textarea>
+      </label>
+      <div class="space-dialog-actions">
+        <button id="note-cancel" class="space-button ghost" type="button">Cancel</button>
+        <button class="space-button" type="submit">Save note</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="gallery-lightbox" class="gallery-lightbox">
     <div style="display:flex;justify-content:flex-end">
       <button id="gallery-lightbox-close" class="space-button ghost" type="button">Close</button>
@@ -561,6 +638,15 @@
   <!-- Menu for a message: react, reply, copy, unsend -->
   <div id="msg-menu" class="msg-menu" role="menu" hidden>
     <div id="quick-reacts" class="quick-reacts"></div>
+    <button type="button" role="menuitem" data-act="save-message">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4.8A1.8 1.8 0 0 1 7.8 3h8.4A1.8 1.8 0 0 1 18 4.8V21l-6-4-6 4z"/></svg>
+      <span>Save message</span>
+    </button>
+    <button type="button" role="menuitem" data-act="pin-message">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m16 3 5 5-4 1-4 4-1 5-2-2-5 5-1-1 5-5-2-2 5-1 4-4z"/></svg>
+      <span>Pin message</span>
+    </button>
+
     <button type="button" role="menuitem" data-act="reply">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 6 6v5"/></svg>
       Reply

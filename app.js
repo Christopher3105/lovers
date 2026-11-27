@@ -1388,6 +1388,18 @@ function openMenu(m, bubble, trigger = null) {
   unsendBtn.dataset.armed = '';
   unsendBtn.querySelector('span').textContent = 'Unsend';
 
+  const saveMessageBtn = el.menu.querySelector('[data-act="save-message"]');
+  const pinMessageBtn = el.menu.querySelector('[data-act="pin-message"]');
+  saveMessageBtn.querySelector('span').textContent = 'Save message';
+  pinMessageBtn.querySelector('span').textContent = 'Pin message';
+  sb.from('relationship_saved_messages').select('id,pinned')
+    .eq('user_id', state.me.id).eq('message_id', m.id).maybeSingle()
+    .then(({ data, error }) => {
+      if (error || state.menuMsg?.id !== m.id || el.menu.hidden) return;
+      saveMessageBtn.querySelector('span').textContent = data ? 'Remove from saved' : 'Save message';
+      pinMessageBtn.querySelector('span').textContent = data?.pinned ? 'Unpin message' : 'Pin message';
+    });
+
   el.menu.hidden = false;
   const r = bubble.getBoundingClientRect();
   const mw = el.menu.offsetWidth;
@@ -1499,9 +1511,84 @@ async function saveMessageVoiceToLibrary(m) {
   }
 }
 
+async function changeMessageBookmark(m, action) {
+  if (!state.me || !m || typeof m.id !== 'number') return;
+  const { data: saved, error: lookupError } = await sb.from('relationship_saved_messages')
+    .select('id,pinned').eq('user_id', state.me.id).eq('message_id', m.id).maybeSingle();
+  if (lookupError) return toast(`Couldn't check saved message: ${lookupError.message}`);
+
+  if (action === 'save') {
+    if (saved) {
+      const { error } = await sb.from('relationship_saved_messages').delete().eq('id', saved.id);
+      if (error) return toast(`Couldn't remove saved message: ${error.message}`);
+      toast('Removed from your saved messages.');
+    } else {
+      const { error } = await sb.from('relationship_saved_messages').insert({
+        user_id: state.me.id, message_id: m.id, pinned: false,
+      });
+      if (error) return toast(`Couldn't save message: ${error.message}`);
+      toast('Message saved.');
+    }
+  } else if (action === 'pin') {
+    if (saved) {
+      const { error } = await sb.from('relationship_saved_messages')
+        .update({ pinned: !saved.pinned }).eq('id', saved.id);
+      if (error) return toast(`Couldn't update pin: ${error.message}`);
+      toast(saved.pinned ? 'Message unpinned.' : 'Message pinned.');
+    } else {
+      const { error } = await sb.from('relationship_saved_messages').insert({
+        user_id: state.me.id, message_id: m.id, pinned: true,
+      });
+      if (error) return toast(`Couldn't pin message: ${error.message}`);
+      toast('Message saved and pinned.');
+    }
+  }
+  window.dispatchEvent(new CustomEvent('lovers:saved-changed'));
+}
+
+async function jumpToMessage(detail) {
+  const messageId = Number(detail?.messageId);
+  const peerId = detail?.peerId;
+  if (!Number.isSafeInteger(messageId) || !peerId || !state.me) return;
+  await loadContacts();
+  if (!state.contacts.has(peerId)) return toast('That conversation is no longer available.');
+  window.dispatchEvent(new CustomEvent('lovers:show-chat'));
+  await openConvo(peerId);
+  if (state.activeId !== peerId) return;
+
+  const c = convo(peerId);
+  if (!c.byId.has(messageId)) {
+    const [beforeResult, targetResult, afterResult] = await Promise.all([
+      conversationQuery(peerId).lt('id', messageId).order('id', { ascending: false }).limit(16),
+      conversationQuery(peerId).eq('id', messageId).maybeSingle(),
+      conversationQuery(peerId).gt('id', messageId).order('id', { ascending: true }).limit(16),
+    ]);
+    const error = beforeResult.error || targetResult.error || afterResult.error;
+    if (error) return toast(`Couldn't open that message: ${error.message}`);
+    const rows = [
+      ...(beforeResult.data || []).reverse(),
+      ...(targetResult.data ? [targetResult.data] : []),
+      ...(afterResult.data || []),
+    ];
+    if (!rows.some((row) => row.id === messageId)) return toast('That message may have been deleted.');
+    await loadReactions(rows.map((row) => row.id));
+    rows.forEach((row) => upsert(c, row));
+    renderMessages();
+  }
+
+  const node = el.messages.querySelector(`.msg[data-id="${messageId}"]`);
+  if (node) {
+    node.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    node.classList.add('search-highlight');
+    setTimeout(() => node.classList.remove('search-highlight'), 1800);
+  }
+}
+
 function onMenuAction(act, button) {
   const m = state.menuMsg;
   if (!m) return;
+  if (act === 'save-message') { closeMenu(); changeMessageBookmark(m, 'save'); return; }
+  if (act === 'pin-message') { closeMenu(); changeMessageBookmark(m, 'pin'); return; }
   if (act === 'save-gallery') { closeMenu(); saveMessagePhotoToGallery(m); return; }
   if (act === 'save-voice') { closeMenu(); saveMessageVoiceToLibrary(m); return; }
   if (act === 'reply') { closeMenu(); startReply(m); }
@@ -2268,6 +2355,7 @@ function notify(title, body, fromId) {
 
 // ============================================================ EVENTS
 function wireEvents() {
+  window.addEventListener('lovers:open-message', (event) => jumpToMessage(event.detail));
   el.loginForm.addEventListener('submit', login);
   el.back.addEventListener('click', () => {
     el.app.classList.remove('chat-open');

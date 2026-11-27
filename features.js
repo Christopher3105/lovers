@@ -22,6 +22,11 @@ const state = {
   timelineItems: [],
   ideas: [],
   checkins: [],
+  notes: [],
+  savedMessages: [],
+  searchResults: [],
+  searchErrors: [],
+  editingNoteId: null,
   selectedIdeaId: null,
   selectedMood: 'good',
   channel: null,
@@ -92,6 +97,9 @@ const pageCopy = {
   timeline: ['Our timeline', 'A growing story made from your dates, photographs, and little milestones.'],
   jar: ['Date night jar', 'Let the jar choose a simple, fun plan for the two of you.'],
   checkin: ['Daily check-in', 'A small daily pause to share how today is going.'],
+  search: ['Search everything', 'Find messages, photo captions, shared notes, dates and plans.'],
+  saved: ['Saved messages', 'Your personal shelf for messages you want to find again.'],
+  notes: ['Shared notes', 'A little notebook both of you can read and update.'],
 };
 
 function showPage(page) {
@@ -125,6 +133,8 @@ function showPage(page) {
   if (page === 'timeline') loadTimeline();
   if (page === 'jar') loadDateIdeas();
   if (page === 'checkin') loadCheckins();
+  if (page === 'saved') loadSavedMessages();
+  if (page === 'notes') loadNotes();
 }
 
 function wireNavigation() {
@@ -169,6 +179,8 @@ function setupRealtime() {
     'relationship_date_ideas',
     'relationship_daily_checkins',
     'relationship_voice_records',
+    'relationship_notes',
+    'relationship_saved_messages',
   ]) {
     channel.on('postgres_changes', { event: '*', schema: 'public', table }, () => {
       clearTimeout(state.refreshTimer);
@@ -179,6 +191,8 @@ function setupRealtime() {
         if (state.page === 'jar') await loadDateIdeas();
         if (state.page === 'checkin') await loadCheckins();
         if (state.page === 'voices') await loadVoices();
+        if (state.page === 'notes') await loadNotes();
+        if (state.page === 'saved') await loadSavedMessages();
       }, 250);
     });
   }
@@ -210,6 +224,9 @@ function resetSpace() {
   state.timelineItems = [];
   state.ideas = [];
   state.checkins = [];
+  state.notes = [];
+  state.savedMessages = [];
+  state.editingNoteId = null;
   state.selectedIdeaId = null;
   state.names.clear();
   clearInterval(state.timer);
@@ -1586,6 +1603,386 @@ function wireCheckins() {
   $('checkin-save').addEventListener('click', saveCheckin);
 }
 
+/* ----------------------------- Shared notes ----------------------------- */
+async function loadNotes() {
+  if (!state.user) return;
+  const { data, error } = await sb.from('relationship_notes').select('*')
+    .order('updated_at', { ascending: false });
+  if (error) {
+    toast(`Shared notes: ${error.message}`);
+    return;
+  }
+  state.notes = data || [];
+  renderNotes();
+}
+
+function renderNotes() {
+  const list = $('notes-list');
+  if (!list) return;
+  list.replaceChildren();
+  if (!state.notes.length) {
+    list.append(makeEmpty('Your shared notebook is empty. Add your first note.'));
+    return;
+  }
+
+  for (const note of state.notes) {
+    const card = document.createElement('article');
+    card.className = 'shared-note-card';
+    const head = document.createElement('div');
+    head.className = 'shared-note-head';
+    const copy = document.createElement('div');
+    copy.className = 'shared-note-copy';
+    const title = document.createElement('h3');
+    title.textContent = note.title;
+    const meta = document.createElement('span');
+    meta.className = 'shared-note-meta';
+    const editorName = state.names.get(note.updated_by) || 'One of you';
+    const updated = new Date(note.updated_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+    meta.textContent = `Updated by ${editorName} · ${updated}`;
+    copy.append(title, meta);
+    const actions = document.createElement('div');
+    actions.className = 'shared-note-actions';
+    const edit = document.createElement('button');
+    edit.type = 'button';
+    edit.className = 'space-button secondary';
+    edit.textContent = 'Edit';
+    edit.addEventListener('click', () => openNoteEditor(note));
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'space-button danger';
+    remove.textContent = 'Delete';
+    remove.addEventListener('click', () => deleteNote(note.id));
+    actions.append(edit, remove);
+    head.append(copy, actions);
+    const content = document.createElement('p');
+    content.className = 'shared-note-content';
+    content.textContent = note.content || 'This note is empty.';
+    card.append(head, content);
+    list.append(card);
+  }
+}
+
+function openNoteEditor(note = null) {
+  state.editingNoteId = note?.id || null;
+  $('note-dialog-title').textContent = note ? 'Edit shared note' : 'New shared note';
+  $('note-title').value = note?.title || '';
+  $('note-content').value = note?.content || '';
+  $('note-dialog').showModal();
+  $('note-title').focus();
+}
+
+async function saveNote(event) {
+  event.preventDefault();
+  if (!state.user) return;
+  const title = $('note-title').value.trim();
+  const content = $('note-content').value;
+  if (!title) return;
+  const now = new Date().toISOString();
+  const payload = { title, content, updated_by: state.user.id, updated_at: now };
+
+  let result;
+  if (state.editingNoteId) {
+    result = await sb.from('relationship_notes').update(payload)
+      .eq('id', state.editingNoteId).select().single();
+  } else {
+    result = await sb.from('relationship_notes').insert({
+      ...payload,
+      created_by: state.user.id,
+      created_at: now,
+    }).select().single();
+  }
+  if (result.error) {
+    toast(`Couldn't save note: ${result.error.message}`);
+    return;
+  }
+  const note = result.data;
+  state.notes = [note, ...state.notes.filter((item) => item.id !== note.id)]
+    .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+  $('note-dialog').close();
+  state.editingNoteId = null;
+  renderNotes();
+  toast('Shared note saved.');
+}
+
+async function deleteNote(id) {
+  const note = state.notes.find((item) => item.id === id);
+  if (!note || !confirm(`Delete "${note.title}" from the shared notebook?`)) return;
+  const { error } = await sb.from('relationship_notes').delete().eq('id', id);
+  if (error) return toast(`Couldn't delete note: ${error.message}`);
+  state.notes = state.notes.filter((item) => item.id !== id);
+  renderNotes();
+  toast('Shared note deleted.');
+}
+
+function wireNotes() {
+  $('note-add').addEventListener('click', () => openNoteEditor());
+  $('note-form').addEventListener('submit', saveNote);
+  $('note-cancel').addEventListener('click', () => $('note-dialog').close());
+  $('note-dialog').addEventListener('close', () => { state.editingNoteId = null; });
+}
+
+/* ----------------------------- Saved messages ----------------------------- */
+async function loadSavedMessages() {
+  if (!state.user) return;
+  $('saved-message-count').textContent = 'Loading saved messages…';
+  const { data: saved, error } = await sb.from('relationship_saved_messages')
+    .select('id,message_id,pinned,created_at')
+    .order('pinned', { ascending: false })
+    .order('created_at', { ascending: false });
+  if (error) {
+    $('saved-message-count').textContent = 'Saved messages could not be loaded.';
+    toast(`Saved messages: ${error.message}`);
+    return;
+  }
+  if (!saved?.length) {
+    state.savedMessages = [];
+    renderSavedMessages();
+    return;
+  }
+  const { data: messages, error: messageError } = await sb.from('messages')
+    .select('id,sender_id,receiver_id,kind,body,created_at,deleted_at')
+    .in('id', saved.map((item) => item.message_id));
+  if (messageError) {
+    toast(`Saved messages: ${messageError.message}`);
+    return;
+  }
+  const byId = new Map((messages || []).map((item) => [item.id, item]));
+  state.savedMessages = saved
+    .map((item) => ({ ...item, message: byId.get(item.message_id) }))
+    .filter((item) => item.message && !item.message.deleted_at)
+    .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.created_at.localeCompare(a.created_at));
+  renderSavedMessages();
+}
+
+function renderSavedMessages() {
+  const list = $('saved-message-list');
+  if (!list) return;
+  list.replaceChildren();
+  const totalPinned = state.savedMessages.filter((item) => item.pinned).length;
+  $('saved-message-count').textContent = `${state.savedMessages.length} saved · ${totalPinned} pinned`;
+  if (!state.savedMessages.length) {
+    list.append(makeEmpty('Nothing saved yet. Open a message menu and choose Save message.'));
+    return;
+  }
+
+  for (const saved of state.savedMessages) {
+    const m = saved.message;
+    const peerId = m.sender_id === state.user.id ? m.receiver_id : m.sender_id;
+    const senderName = state.names.get(m.sender_id) || 'One of you';
+    const card = document.createElement('article');
+    card.className = 'saved-message-card';
+    const top = document.createElement('div');
+    top.className = 'saved-message-top';
+    const copy = document.createElement('div');
+    copy.className = 'saved-message-copy';
+    const label = document.createElement('span');
+    label.className = 'saved-message-label';
+    label.textContent = saved.pinned ? 'Pinned message' : 'Saved message';
+    const title = document.createElement('strong');
+    title.textContent = `${senderName} · ${new Date(m.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}`;
+    const detail = document.createElement('p');
+    detail.textContent = m.kind === 'text' ? (m.body || '') :
+      m.kind === 'image' ? '📷 Photo message' :
+      m.kind === 'audio' ? '🎙 Voice message' : 'Sticker message';
+    copy.append(label, title, detail);
+    const actions = document.createElement('div');
+    actions.className = 'saved-message-actions';
+    const open = document.createElement('button');
+    open.type = 'button';
+    open.className = 'space-button secondary';
+    open.textContent = 'Open in chat';
+    open.addEventListener('click', () => window.dispatchEvent(new CustomEvent('lovers:open-message', {
+      detail: { messageId: m.id, peerId },
+    })));
+    const pin = document.createElement('button');
+    pin.type = 'button';
+    pin.className = 'space-button ghost';
+    pin.textContent = saved.pinned ? 'Unpin' : 'Pin';
+    pin.addEventListener('click', () => toggleSavedPin(saved));
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'space-button danger';
+    remove.textContent = 'Remove';
+    remove.addEventListener('click', () => removeSavedMessage(saved));
+    actions.append(open, pin, remove);
+    top.append(copy, actions);
+    card.append(top);
+    list.append(card);
+  }
+}
+
+async function toggleSavedPin(saved) {
+  const { error } = await sb.from('relationship_saved_messages')
+    .update({ pinned: !saved.pinned }).eq('id', saved.id);
+  if (error) return toast(`Couldn't update pin: ${error.message}`);
+  await loadSavedMessages();
+  window.dispatchEvent(new CustomEvent('lovers:saved-changed'));
+}
+
+async function removeSavedMessage(saved) {
+  const { error } = await sb.from('relationship_saved_messages').delete().eq('id', saved.id);
+  if (error) return toast(`Couldn't remove saved message: ${error.message}`);
+  state.savedMessages = state.savedMessages.filter((item) => item.id !== saved.id);
+  renderSavedMessages();
+  window.dispatchEvent(new CustomEvent('lovers:saved-changed'));
+}
+
+/* ----------------------------- Global search ----------------------------- */
+async function runGlobalSearch(event) {
+  event?.preventDefault();
+  if (!state.user) return;
+  const term = $('global-search-input').value.trim().slice(0, 100);
+  const kind = $('global-search-kind').value;
+  const resultsNode = $('global-search-results');
+  resultsNode.replaceChildren();
+  if (!term) {
+    $('global-search-count').textContent = 'Type something to search.';
+    return;
+  }
+
+  $('global-search-count').textContent = 'Searching…';
+  const pattern = `%${term}%`;
+  const jobs = [];
+  const add = (type, table, query) => jobs.push(
+    query.then(({ data, error }) => {
+      if (error) throw new Error(`${table}: ${error.message}`);
+      (data || []).forEach((row) => state.searchResults.push({ type, row }));
+    }).catch((error) => state.searchErrors.push(error.message))
+  );
+  state.searchResults = [];
+  state.searchErrors = [];
+
+  if (kind === 'all' || kind === 'messages') {
+    add('message', 'messages', sb.from('messages')
+      .select('id,sender_id,receiver_id,kind,body,created_at')
+      .is('deleted_at', null).ilike('body', pattern)
+      .order('created_at', { ascending: false }).limit(12));
+  }
+  if (kind === 'all' || kind === 'photos') {
+    add('photo', 'photos', sb.from('relationship_photos')
+      .select('id,caption,photo_date,uploaded_by')
+      .ilike('caption', pattern).order('photo_date', { ascending: false }).limit(8));
+  }
+  if (kind === 'all' || kind === 'notes') {
+    add('note-title', 'notes', sb.from('relationship_notes')
+      .select('id,title,content,updated_at,updated_by')
+      .ilike('title', pattern).order('updated_at', { ascending: false }).limit(8));
+    add('note-content', 'notes', sb.from('relationship_notes')
+      .select('id,title,content,updated_at,updated_by')
+      .ilike('content', pattern).order('updated_at', { ascending: false }).limit(8));
+  }
+  if (kind === 'all' || kind === 'dates') {
+    add('date-title', 'calendar', sb.from('relationship_events')
+      .select('id,title,description,event_date')
+      .ilike('title', pattern).order('event_date', { ascending: false }).limit(8));
+    add('date-description', 'calendar', sb.from('relationship_events')
+      .select('id,title,description,event_date')
+      .ilike('description', pattern).order('event_date', { ascending: false }).limit(8));
+  }
+  if (kind === 'all' || kind === 'tasks') {
+    add('task', 'tasks', sb.from('relationship_tasks')
+      .select('id,title,done,created_at')
+      .ilike('title', pattern).order('created_at', { ascending: false }).limit(8));
+  }
+
+  await Promise.all(jobs);
+  const unique = new Map();
+  for (const result of state.searchResults) {
+    const id = result.row.id;
+    const key = `${result.type.startsWith('note') ? 'note' : result.type.startsWith('date') ? 'date' : result.type}:${id}`;
+    if (!unique.has(key)) unique.set(key, result);
+  }
+  state.searchResults = [...unique.values()];
+  renderGlobalSearch(term);
+}
+
+function renderGlobalSearch(term) {
+  const list = $('global-search-results');
+  list.replaceChildren();
+  $('global-search-count').textContent = `${state.searchResults.length} result${state.searchResults.length === 1 ? '' : 's'} for “${term}”`;
+  if (!state.searchResults.length) {
+    list.append(makeEmpty(state.searchErrors.length
+      ? 'Some sections could not be searched. Check the notification above.'
+      : 'No matches found. Try another word or category.'));
+    return;
+  }
+
+  const labels = {
+    message: 'MESSAGE',
+    photo: 'PHOTO CAPTION',
+    'note-title': 'SHARED NOTE',
+    'note-content': 'SHARED NOTE',
+    'date-title': 'CALENDAR DATE',
+    'date-description': 'CALENDAR DATE',
+    task: 'TO-DO ITEM',
+  };
+  const detailFor = (type, row) => {
+    if (type === 'message') return row.kind === 'text' ? row.body : row.kind === 'image' ? 'Photo message' : row.kind === 'audio' ? 'Voice message' : 'Sticker message';
+    if (type === 'photo') return row.caption || 'Saved photo';
+    if (type.startsWith('note')) return row.content || 'Shared note';
+    if (type.startsWith('date')) return row.description || 'Calendar date';
+    return row.done ? `Completed · ${row.title}` : row.title;
+  };
+
+  for (const result of state.searchResults) {
+    const { type, row } = result;
+    const card = document.createElement('article');
+    card.className = 'tool-result';
+    const copy = document.createElement('div');
+    copy.className = 'tool-result-copy';
+    const label = document.createElement('span');
+    label.className = 'tool-result-kind';
+    label.textContent = labels[type] || type.toUpperCase();
+    const title = document.createElement('strong');
+    title.textContent = type === 'message'
+      ? (row.kind === 'text' ? (row.body || 'Message').slice(0, 100) : detailFor(type, row))
+      : type === 'photo' ? (row.caption || 'Saved photo')
+      : type.startsWith('note') ? row.title
+      : type.startsWith('date') ? row.title
+      : row.title;
+    const detail = document.createElement('p');
+    detail.textContent = type === 'message' ? `${state.names.get(row.sender_id) || 'One of you'} · ${new Date(row.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}`
+      : type === 'photo' ? formatDate(row.photo_date)
+      : type.startsWith('note') ? `Updated ${new Date(row.updated_at).toLocaleDateString()}`
+      : type.startsWith('date') ? formatDate(row.event_date)
+      : row.done ? 'Completed' : 'To do';
+    const meta = document.createElement('small');
+    meta.textContent = detailFor(type, row).slice(0, 220);
+    copy.append(label, title, detail, meta);
+    const open = document.createElement('button');
+    open.type = 'button';
+    open.className = 'space-button secondary';
+    open.textContent = 'Open';
+    open.addEventListener('click', () => {
+      if (type === 'message') {
+        const peerId = row.sender_id === state.user.id ? row.receiver_id : row.sender_id;
+        window.dispatchEvent(new CustomEvent('lovers:open-message', { detail: { messageId: row.id, peerId } }));
+      } else if (type === 'photo') showPage('gallery');
+      else if (type.startsWith('note')) showPage('notes');
+      else if (type.startsWith('date')) showPage('calendar');
+      else showPage('tasks');
+    });
+    card.append(copy, open);
+    list.append(card);
+  }
+  if (state.searchErrors.length) {
+    const warning = document.createElement('p');
+    warning.className = 'space-muted';
+    warning.textContent = `Some sections were not searched: ${[...new Set(state.searchErrors)].join(' · ')}`;
+    list.append(warning);
+  }
+}
+
+function wireSearch() {
+  $('global-search-form').addEventListener('submit', runGlobalSearch);
+  $('global-search-clear').addEventListener('click', () => {
+    $('global-search-input').value = '';
+    $('global-search-results').replaceChildren();
+    $('global-search-count').textContent = 'Search results will appear here.';
+    $('global-search-input').focus();
+  });
+}
+
 /* ----------------------------- Startup ----------------------------- */
 function wireAll() {
   wireNavigation();
@@ -1596,6 +1993,12 @@ function wireAll() {
   wireTimeline();
   wireDateJar();
   wireCheckins();
+  wireNotes();
+  wireSearch();
+  window.addEventListener('lovers:show-chat', () => showPage('chat'));
+  window.addEventListener('lovers:saved-changed', () => {
+    if (state.page === 'saved') loadSavedMessages();
+  });
 }
 
 wireAll();
