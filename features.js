@@ -15,6 +15,12 @@ const state = {
   tasks: [],
   photos: [],
   names: new Map(),
+  milestones: [],
+  timelineItems: [],
+  ideas: [],
+  checkins: [],
+  selectedIdeaId: null,
+  selectedMood: 'good',
   channel: null,
   timer: null,
   refreshTimer: null,
@@ -78,6 +84,9 @@ const pageCopy = {
   calendar: ['Our calendar', 'Birthdays, anniversaries, and the little dates worth remembering.'],
   gallery: ['Our gallery', 'Your shared photo shelf — private, searchable, and saved with its date.'],
   tasks: ['Little plans', 'Small things to do together, one check at a time.'],
+  timeline: ['Our timeline', 'A growing story made from your dates, photographs, and little milestones.'],
+  jar: ['Date night jar', 'Let the jar choose a simple, fun plan for the two of you.'],
+  checkin: ['Daily check-in', 'A small daily pause to share how today is going.'],
 };
 
 function showPage(page) {
@@ -107,6 +116,9 @@ function showPage(page) {
   if (page === 'gallery') loadPhotos();
   if (page === 'tasks') renderTasks();
   if (page === 'home') renderHome();
+  if (page === 'timeline') loadTimeline();
+  if (page === 'jar') loadDateIdeas();
+  if (page === 'checkin') loadCheckins();
 }
 
 function wireNavigation() {
@@ -143,12 +155,22 @@ async function loadBaseData() {
 function setupRealtime() {
   if (state.channel) sb.removeChannel(state.channel);
   const channel = sb.channel(`relationship-space-${state.user.id}`);
-  for (const table of ['relationship_events', 'relationship_tasks', 'relationship_photos']) {
+  for (const table of [
+    'relationship_events',
+    'relationship_tasks',
+    'relationship_photos',
+    'relationship_timeline_entries',
+    'relationship_date_ideas',
+    'relationship_daily_checkins',
+  ]) {
     channel.on('postgres_changes', { event: '*', schema: 'public', table }, () => {
       clearTimeout(state.refreshTimer);
       state.refreshTimer = setTimeout(async () => {
         await loadBaseData();
         if (state.page === 'gallery') await loadPhotos();
+        if (state.page === 'timeline') await loadTimeline();
+        if (state.page === 'jar') await loadDateIdeas();
+        if (state.page === 'checkin') await loadCheckins();
       }, 250);
     });
   }
@@ -173,6 +195,11 @@ function resetSpace() {
   state.events = [];
   state.tasks = [];
   state.photos = [];
+  state.milestones = [];
+  state.timelineItems = [];
+  state.ideas = [];
+  state.checkins = [];
+  state.selectedIdeaId = null;
   state.names.clear();
   clearInterval(state.timer);
   clearTimeout(state.refreshTimer);
@@ -766,12 +793,494 @@ function wireGallery() {
   });
 }
 
+
+/* ----------------------------- Our timeline ----------------------------- */
+async function loadTimeline() {
+  if (!state.user) return;
+
+  const [milestonesResult, photosResult] = await Promise.all([
+    sb.from('relationship_timeline_entries').select('*')
+      .order('milestone_date', { ascending: false }).limit(100),
+    sb.from('relationship_photos').select('*')
+      .order('photo_date', { ascending: false }).order('created_at', { ascending: false }).limit(40),
+  ]);
+
+  if (milestonesResult.error) {
+    toast(`Timeline: ${milestonesResult.error.message}`);
+    state.milestones = [];
+  } else {
+    state.milestones = milestonesResult.data || [];
+  }
+
+  if (photosResult.error) {
+    toast(`Timeline photos: ${photosResult.error.message}`);
+    state.timelineItems = [];
+    renderTimeline();
+    return;
+  }
+
+  const photos = photosResult.data || [];
+  let urlMap = new Map();
+  if (photos.length) {
+    const { data: signed, error } = await sb.storage.from(BUCKET)
+      .createSignedUrls(photos.map((photo) => photo.storage_path), 3600);
+    if (!error) urlMap = new Map((signed || []).map((entry) => [entry.path, entry.signedUrl]));
+  }
+
+  const items = [];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  for (const event of state.events) {
+    const date = event.repeat_yearly
+      ? nextOccurrence(event, today)
+      : parseDate(event.event_date);
+    if (!date) continue;
+    items.push({
+      id: `event:${event.id}`,
+      type: 'event',
+      date: dateISO(date),
+      title: event.title,
+      description: event.description || (event.repeat_yearly ? 'A date that comes around every year.' : ''),
+      color: event.color || '#1478ff',
+      repeat: Boolean(event.repeat_yearly),
+      author: 'Shared calendar',
+    });
+  }
+
+  for (const milestone of state.milestones) {
+    items.push({
+      id: `milestone:${milestone.id}`,
+      type: 'milestone',
+      date: milestone.milestone_date,
+      title: milestone.title,
+      description: milestone.description || '',
+      color: milestone.color || '#ff168f',
+      author: state.names.get(milestone.created_by) || 'One of you',
+      createdBy: milestone.created_by,
+    });
+  }
+
+  for (const photo of photos) {
+    const url = urlMap.get(photo.storage_path);
+    if (!url) continue;
+    items.push({
+      id: `photo:${photo.id}`,
+      type: 'photo',
+      date: photo.photo_date,
+      title: photo.caption || 'A saved moment',
+      description: '',
+      color: '#1478ff',
+      author: state.names.get(photo.uploaded_by) || 'One of you',
+      url,
+      photo,
+    });
+  }
+
+  state.timelineItems = items.sort((a, b) =>
+    b.date.localeCompare(a.date) || a.title.localeCompare(b.title)
+  );
+  renderTimeline();
+}
+
+function renderTimeline() {
+  const feed = $('timeline-feed');
+  if (!feed) return;
+
+  const type = $('timeline-kind')?.value || 'all';
+  const year = $('timeline-year')?.value || '';
+  const years = [...new Set(state.timelineItems.map((item) => item.date.slice(0, 4)))].sort().reverse();
+  const yearSelect = $('timeline-year');
+  const previousYear = yearSelect.value;
+  yearSelect.replaceChildren(new Option('All years', ''));
+  years.forEach((value) => yearSelect.add(new Option(value, value)));
+  if (years.includes(previousYear)) yearSelect.value = previousYear;
+
+  const items = state.timelineItems.filter((item) =>
+    (type === 'all' || item.type === type) &&
+    (!year || item.date.startsWith(`${year}-`))
+  );
+
+  $('timeline-count').textContent = `${items.length} ${items.length === 1 ? 'moment' : 'moments'}`;
+  feed.replaceChildren();
+
+  if (!items.length) {
+    feed.append(makeEmpty('Your story will appear here as you save photos, dates, and milestones.'));
+    return;
+  }
+
+  for (const item of items) {
+    const card = document.createElement('article');
+    card.className = `timeline-item timeline-${item.type}`;
+    card.style.setProperty('--timeline-color', item.color);
+
+    const marker = document.createElement('span');
+    marker.className = 'timeline-marker';
+    marker.setAttribute('aria-hidden', 'true');
+
+    const body = document.createElement('div');
+    body.className = 'timeline-card';
+
+    const meta = document.createElement('div');
+    meta.className = 'timeline-meta';
+    const kind = document.createElement('span');
+    kind.className = 'timeline-kind';
+    kind.textContent = item.type === 'event' ? 'CALENDAR DATE' : item.type === 'photo' ? 'PHOTO MEMORY' : 'MILESTONE';
+    const date = document.createElement('time');
+    date.dateTime = item.date;
+    date.textContent = formatDate(item.date, { day: 'numeric', month: 'long', year: 'numeric' });
+    meta.append(kind, date);
+
+    const heading = document.createElement('h3');
+    heading.textContent = item.title;
+    body.append(meta, heading);
+
+    if (item.type === 'photo' && item.url) {
+      const imageButton = document.createElement('button');
+      imageButton.type = 'button';
+      imageButton.className = 'timeline-photo-button';
+      imageButton.setAttribute('aria-label', `Open ${item.title}`);
+      const image = new Image();
+      image.src = item.url;
+      image.alt = item.title;
+      image.loading = 'lazy';
+      imageButton.append(image);
+      imageButton.addEventListener('click', () => openGalleryPhoto(item.url, item.photo));
+      body.append(imageButton);
+    }
+
+    if (item.description) {
+      const description = document.createElement('p');
+      description.textContent = item.description;
+      body.append(description);
+    }
+
+    const footer = document.createElement('div');
+    footer.className = 'timeline-footer';
+    const author = document.createElement('span');
+    author.textContent = item.repeat ? 'Repeats every year' : item.author;
+    footer.append(author);
+
+    if (item.type === 'milestone' && item.createdBy === state.user.id) {
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'timeline-remove';
+      remove.textContent = 'Remove';
+      remove.addEventListener('click', () => deleteMilestone(item.id.slice('milestone:'.length)));
+      footer.append(remove);
+    }
+    body.append(footer);
+    card.append(marker, body);
+    feed.append(card);
+  }
+}
+
+async function deleteMilestone(id) {
+  if (!confirm('Remove this milestone from your shared timeline?')) return;
+  const { error } = await sb.from('relationship_timeline_entries').delete().eq('id', id);
+  if (error) return toast(`Couldn't remove milestone: ${error.message}`);
+  state.milestones = state.milestones.filter((item) => item.id !== id);
+  await loadTimeline();
+  toast('Milestone removed.');
+}
+
+function openMilestoneDialog() {
+  $('timeline-form').reset();
+  $('milestone-date').value = dateISO(new Date());
+  $('milestone-color').value = '#ff168f';
+  $('timeline-dialog').showModal();
+}
+
+async function saveMilestone(event) {
+  event.preventDefault();
+  const title = $('milestone-title').value.trim();
+  const date = $('milestone-date').value;
+  if (!title || !date || !state.user) return;
+
+  const { error } = await sb.from('relationship_timeline_entries').insert({
+    title,
+    description: $('milestone-description').value.trim(),
+    milestone_date: date,
+    color: $('milestone-color').value,
+    created_by: state.user.id,
+  });
+  if (error) return toast(`Couldn't save milestone: ${error.message}`);
+  $('timeline-dialog').close();
+  await loadTimeline();
+  toast('Milestone added to your story.');
+}
+
+function wireTimeline() {
+  $('timeline-add').addEventListener('click', openMilestoneDialog);
+  $('timeline-dialog-close').addEventListener('click', () => $('timeline-dialog').close());
+  $('timeline-form').addEventListener('submit', saveMilestone);
+  $('timeline-kind').addEventListener('change', renderTimeline);
+  $('timeline-year').addEventListener('change', renderTimeline);
+}
+
+/* ----------------------------- Date night jar ----------------------------- */
+async function loadDateIdeas() {
+  if (!state.user) return;
+  const { data, error } = await sb.from('relationship_date_ideas')
+    .select('*').order('category', { ascending: true }).order('created_at', { ascending: false });
+  if (error) {
+    toast(`Date jar: ${error.message}`);
+    return;
+  }
+  state.ideas = data || [];
+  if (!state.selectedIdeaId) {
+    const recent = [...state.ideas]
+      .filter((idea) => idea.last_picked_at)
+      .sort((a, b) => b.last_picked_at.localeCompare(a.last_picked_at))[0];
+    state.selectedIdeaId = recent?.id || null;
+  }
+  renderDateIdeas();
+}
+
+function renderDateIdeas() {
+  const list = $('date-idea-list');
+  if (!list) return;
+  list.replaceChildren();
+
+  const selected = state.ideas.find((idea) => idea.id === state.selectedIdeaId) ||
+    [...state.ideas].filter((idea) => idea.last_picked_at)
+      .sort((a, b) => b.last_picked_at.localeCompare(a.last_picked_at))[0] || null;
+
+  const pickedCard = $('date-picked');
+  pickedCard.replaceChildren();
+  if (selected) {
+    const label = document.createElement('span');
+    label.className = 'date-picked-label';
+    label.textContent = 'THE JAR PICKED';
+    const title = document.createElement('h2');
+    title.textContent = selected.title;
+    const description = document.createElement('p');
+    description.textContent = selected.description || 'A little plan, just waiting to happen.';
+    const category = document.createElement('span');
+    category.className = 'date-category';
+    category.textContent = selected.category;
+    pickedCard.append(label, title, description, category);
+  } else {
+    pickedCard.append(makeEmpty('Add a few ideas, then let the jar surprise you.'));
+  }
+
+  $('date-idea-count').textContent = `${state.ideas.length} ${state.ideas.length === 1 ? 'idea' : 'ideas'} in the jar`;
+
+  for (const idea of state.ideas) {
+    const row = document.createElement('article');
+    row.className = 'date-idea-row';
+    const copy = document.createElement('div');
+    copy.className = 'date-idea-copy';
+    const title = document.createElement('strong');
+    title.textContent = idea.title;
+    const detail = document.createElement('span');
+    detail.textContent = `${idea.category}${idea.last_picked_at ? ` · Picked ${formatDate(idea.last_picked_at.slice(0, 10), { day: 'numeric', month: 'short' })}` : ' · Not picked yet'}`;
+    copy.append(title, detail);
+    row.append(copy);
+
+    if (idea.created_by === state.user.id) {
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'date-idea-remove';
+      remove.setAttribute('aria-label', `Remove ${idea.title}`);
+      remove.innerHTML = icons.trash;
+      remove.addEventListener('click', () => deleteDateIdea(idea.id));
+      row.append(remove);
+    }
+    list.append(row);
+  }
+
+  if (!state.ideas.length) list.append(makeEmpty('The jar is empty. Add the first idea.'));
+}
+
+async function pickDateIdea() {
+  if (!state.ideas.length) return toast('Add an idea to the jar first.');
+  const unpicked = state.ideas.filter((idea) => !idea.last_picked_at);
+  let pool = unpicked;
+  if (!pool.length) {
+    const oldestTime = Math.min(...state.ideas.map((idea) => new Date(idea.last_picked_at).getTime()));
+    pool = state.ideas.filter((idea) => new Date(idea.last_picked_at).getTime() === oldestTime);
+  }
+
+  const selected = pool[Math.floor(Math.random() * pool.length)];
+  const pickedAt = new Date().toISOString();
+  const { error } = await sb.from('relationship_date_ideas')
+    .update({ last_picked_at: pickedAt }).eq('id', selected.id);
+  if (error) return toast(`Couldn't draw an idea: ${error.message}`);
+
+  state.ideas = state.ideas.map((idea) =>
+    idea.id === selected.id ? { ...idea, last_picked_at: pickedAt } : idea
+  );
+  state.selectedIdeaId = selected.id;
+  renderDateIdeas();
+}
+
+async function addDateIdea(event) {
+  event.preventDefault();
+  const title = $('date-idea-title').value.trim();
+  if (!title || !state.user) return;
+  const { data, error } = await sb.from('relationship_date_ideas').insert({
+    title,
+    description: $('date-idea-description').value.trim(),
+    category: $('date-idea-category').value,
+    created_by: state.user.id,
+  }).select().single();
+
+  if (error) {
+    const duplicate = /duplicate key/i.test(error.message);
+    return toast(duplicate ? 'That idea is already in your jar.' : `Couldn't add idea: ${error.message}`);
+  }
+
+  state.ideas.unshift(data);
+  state.selectedIdeaId = data.id;
+  $('date-idea-form').reset();
+  renderDateIdeas();
+  toast('Added to your date jar.');
+}
+
+async function deleteDateIdea(id) {
+  if (!confirm('Remove this idea from the shared jar?')) return;
+  const { error } = await sb.from('relationship_date_ideas').delete().eq('id', id);
+  if (error) return toast(`Couldn't remove idea: ${error.message}`);
+  state.ideas = state.ideas.filter((idea) => idea.id !== id);
+  if (state.selectedIdeaId === id) state.selectedIdeaId = null;
+  renderDateIdeas();
+}
+
+function wireDateJar() {
+  $('date-pick').addEventListener('click', pickDateIdea);
+  $('date-idea-form').addEventListener('submit', addDateIdea);
+}
+
+/* ----------------------------- Daily check-in ----------------------------- */
+const MOODS = {
+  great: { emoji: '🌞', label: 'Great' },
+  good: { emoji: '😊', label: 'Good' },
+  okay: { emoji: '😐', label: 'Okay' },
+  tired: { emoji: '😴', label: 'Tired' },
+  quiet: { emoji: '🤍', label: 'Need a quiet day' },
+};
+
+async function loadCheckins() {
+  if (!state.user) return;
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - 6);
+  const today = dateISO(new Date());
+  const { data, error } = await sb.from('relationship_daily_checkins').select('*')
+    .gte('checkin_date', dateISO(start)).lte('checkin_date', today)
+    .order('checkin_date', { ascending: false }).order('updated_at', { ascending: false });
+  if (error) {
+    toast(`Daily check-in: ${error.message}`);
+    return;
+  }
+
+  state.checkins = data || [];
+  const own = state.checkins.find((entry) => entry.user_id === state.user.id && entry.checkin_date === today);
+  state.selectedMood = own?.mood || state.selectedMood || 'good';
+  $('checkin-note').value = own?.note || '';
+  $('checkin-date-label').textContent = formatDate(today, { weekday: 'long', day: 'numeric', month: 'long' });
+  renderCheckins();
+}
+
+function renderCheckins() {
+  const today = dateISO(new Date());
+  const todayRows = state.checkins.filter((entry) => entry.checkin_date === today);
+  const partnerGrid = $('checkin-people');
+  partnerGrid.replaceChildren();
+
+  for (const [userId, name] of state.names.entries()) {
+    const entry = todayRows.find((item) => item.user_id === userId);
+    const card = document.createElement('article');
+    card.className = 'checkin-person-card';
+    const nameNode = document.createElement('strong');
+    nameNode.textContent = userId === state.user.id ? `${name} · You` : name;
+    const moodNode = document.createElement('div');
+    moodNode.className = 'checkin-person-mood';
+
+    if (entry) {
+      const mood = MOODS[entry.mood] || MOODS.okay;
+      moodNode.textContent = `${mood.emoji} ${mood.label}`;
+      const note = document.createElement('p');
+      note.textContent = entry.note || 'No note today — just checking in.';
+      card.append(nameNode, moodNode, note);
+      const updated = document.createElement('small');
+      updated.textContent = `Shared ${new Date(entry.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+      card.append(updated);
+    } else {
+      moodNode.textContent = '🤍 Not checked in yet';
+      const pending = document.createElement('p');
+      pending.textContent = userId === state.user.id ? 'Your check-in is ready when you are.' : 'Their update will appear here.';
+      card.append(nameNode, moodNode, pending);
+    }
+    partnerGrid.append(card);
+  }
+
+  document.querySelectorAll('[data-mood]').forEach((button) => {
+    const active = button.dataset.mood === state.selectedMood;
+    button.classList.toggle('selected', active);
+    button.setAttribute('aria-pressed', String(active));
+  });
+
+  const history = $('checkin-history');
+  history.replaceChildren();
+  const older = state.checkins.filter((entry) => entry.checkin_date !== today);
+  if (!older.length) {
+    history.append(makeEmpty('Your recent check-ins will collect here day by day.'));
+  } else {
+    for (const entry of older) {
+      const row = document.createElement('article');
+      row.className = 'checkin-history-row';
+      const mood = MOODS[entry.mood] || MOODS.okay;
+      const title = document.createElement('strong');
+      title.textContent = `${formatDate(entry.checkin_date, { day: 'numeric', month: 'short' })} · ${state.names.get(entry.user_id) || 'One of you'}`;
+      const detail = document.createElement('span');
+      detail.textContent = `${mood.emoji} ${mood.label}${entry.note ? ` · ${entry.note}` : ''}`;
+      row.append(title, detail);
+      history.append(row);
+    }
+  }
+}
+
+async function saveCheckin() {
+  if (!state.user) return;
+  const today = dateISO(new Date());
+  const { data, error } = await sb.from('relationship_daily_checkins').upsert({
+    user_id: state.user.id,
+    checkin_date: today,
+    mood: state.selectedMood,
+    note: $('checkin-note').value.trim(),
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'user_id,checkin_date' }).select().single();
+
+  if (error) return toast(`Couldn't save check-in: ${error.message}`);
+  state.checkins = [
+    data,
+    ...state.checkins.filter((entry) => !(entry.user_id === data.user_id && entry.checkin_date === data.checkin_date)),
+  ];
+  renderCheckins();
+  toast('Your check-in is shared.');
+}
+
+function wireCheckins() {
+  document.querySelectorAll('[data-mood]').forEach((button) => {
+    button.addEventListener('click', () => {
+      state.selectedMood = button.dataset.mood;
+      renderCheckins();
+    });
+  });
+  $('checkin-save').addEventListener('click', saveCheckin);
+}
+
 /* ----------------------------- Startup ----------------------------- */
 function wireAll() {
   wireNavigation();
   wireCalendar();
   wireTasks();
   wireGallery();
+  wireTimeline();
+  wireDateJar();
+  wireCheckins();
 }
 
 wireAll();
