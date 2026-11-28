@@ -1372,3 +1372,84 @@ html, body { background: #05040a; }
   .text-input{padding-inline:9px}
   .composer .send-btn{width:40px;height:40px}
 }
+
+
+/* Final mobile chat layout: explicit width, fixed tool sizing, and clean composer */
+@media(max-width:760px){
+  html,body{width:100%;max-width:100%;overflow-x:hidden}
+  .app{
+    width:100vw;
+    max-width:100vw;
+    grid-template-columns:minmax(0,1fr);
+    overflow:hidden;
+  }
+  .app.chat-open .chat{
+    width:100%;
+    max-width:100%;
+    min-width:0;
+  }
+  .chat-head{
+    width:100%;
+    display:flex;
+    align-items:center;
+    min-width:0;
+    padding:8px 10px;
+    gap:6px;
+  }
+  .chat-head .back-btn{flex:0 0 34px}
+  .peer-btn{flex:1 1 auto;min-width:0}
+  .chat-search-open{flex:0 0 40px}
+  .stage{width:100%;min-width:0}
+  .messages{width:100%;min-width:0;max-width:100%;padding:10px 9px 12px}
+  .msg{max-width:calc(100% - 42px)}
+  .composer{
+    width:100%;
+    max-width:100%;
+    display:flex;
+    flex-direction:row;
+    align-items:center;
+    gap:4px;
+    padding:7px 7px calc(7px + env(safe-area-inset-bottom));
+    overflow:hidden;
+  }
+  .compose-tools{
+    display:flex;
+    flex:1 1 0;
+    min-width:0;
+    align-items:center;
+    gap:0;
+    overflow:hidden;
+  }
+  .composer .icon-btn{
+    flex:0 0 34px;
+    width:34px;
+    min-width:34px;
+    height:40px;
+  }
+  .composer .icon-btn svg{width:19px;height:19px}
+  .text-input{
+    display:block;
+    flex:1 1 0;
+    width:auto;
+    min-width:0;
+    margin:0 3px;
+    padding:9px 10px;
+    min-height:40px;
+    max-height:100px;
+    font-size:16px;
+  }
+  .composer .send-btn{
+    flex:0 0 42px;
+    width:42px;
+    height:42px;
+    margin:0;
+  }
+  .composer.recording .compose-tools{display:none}
+  .composer.recording .rec-bar{flex:1 1 auto;min-width:0}
+}
+@media(max-width:390px){
+  .composer{gap:2px;padding-inline:5px}
+  .composer .icon-btn{flex-basis:31px;width:31px;min-width:31px}
+  .text-input{margin-inline:2px;padding-inline:8px}
+  .composer .send-btn{flex-basis:40px;width:40px;height:40px}
+}
