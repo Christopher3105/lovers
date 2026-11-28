@@ -1315,3 +1315,60 @@ html, body { background: #05040a; }
  .export-date-grid{grid-template-columns:minmax(0,1fr)}
  .export-submit-row .space-button{width:100%}
 }
+
+
+/* Phone chat polish: keep header and composer compact, balanced and full-width */
+@media(max-width:760px){
+  .app.chat-open{height:100dvh;height:100svh;min-height:0;overflow:hidden}
+  .app.chat-open .chat{height:100%;height:100svh;min-height:0;overflow:hidden}
+  .chat-head{
+    flex:none;
+    min-height:64px;
+    padding:calc(8px + env(safe-area-inset-top)) 10px 8px;
+    gap:7px;
+  }
+  .chat-head .back-btn{width:34px;height:38px;margin:0}
+  .peer-btn{flex:1;min-width:0;gap:9px;margin:0;padding:3px}
+  .peer-text{min-width:0;max-width:100%}
+  .peer-name{font-size:16px}
+  .peer-status{font-size:12px;line-height:1.2;white-space:normal}
+  .chat-search-open{width:40px;height:40px;margin-left:0}
+  .stage{flex:1;min-height:0;overflow:hidden}
+  .messages{width:100%;min-width:0;padding:12px 10px 14px;overscroll-behavior-y:contain}
+  .msg{max-width:min(86%,calc(100vw - 74px))}
+  .bubble{max-width:100%;padding:9px 12px}
+  .text{font-size:16px;line-height:1.42}
+  .composer{
+    flex:none;
+    align-items:center;
+    gap:5px;
+    padding:7px 8px calc(7px + env(safe-area-inset-bottom));
+    min-width:0;
+  }
+  .compose-tools{flex:1 1 auto;min-width:0;gap:2px;align-items:center}
+  .composer .icon-btn{width:34px;height:38px}
+  .composer .icon-btn svg{width:20px;height:20px}
+  .text-input{
+    flex:1 1 0;
+    min-width:0;
+    width:0;
+    min-height:40px;
+    max-height:120px;
+    margin:0 2px;
+    padding:9px 11px;
+    font-size:16px;
+    line-height:1.35;
+    border-radius:20px;
+  }
+  .composer .send-btn{width:44px;height:44px;margin-left:1px}
+  .composer .rec-bar{min-width:0}
+  .composer.recording .compose-tools{display:none}
+  .reply-bar{flex:none}
+  #pinned-banner{flex:none;min-width:0}
+}
+@media(max-width:390px){
+  .composer .icon-btn{width:31px}
+  .compose-tools{gap:0}
+  .text-input{padding-inline:9px}
+  .composer .send-btn{width:40px;height:40px}
+}
